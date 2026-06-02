@@ -388,27 +388,6 @@ button:disabled {
   overflow: hidden;
 }
 
-.motionPanel {
-  right: 24px;
-  bottom: 24px;
-  display: grid;
-  gap: 4px;
-  min-width: 180px;
-  padding: 14px 16px;
-}
-
-.motionPanel span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.motionPanel strong {
-  color: var(--cyan-dark);
-  font-size: 1rem;
-}
 
 .circuitPanel {
   top: 24px;
@@ -852,9 +831,6 @@ select {
     height: 36px;
   }
 
-  .motionPanel {
-    display: none;
-  }
 
   .readoutPanel div {
     padding: 12px;
@@ -1399,50 +1375,17 @@ select {
 }
 
 .hintWallet {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.hintWallet div {
-  padding: 8px 9px;
-  border: 1px solid rgba(142, 205, 222, 0.18);
-  border-radius: 8px;
-  background: rgba(11, 31, 42, 0.56);
-}
-
-.hintWallet span {
-  display: block;
+  margin: 0 0 8px;
   color: var(--muted);
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.hintWallet strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--cyan-dark);
-  font-size: 1rem;
-  line-height: 1;
-}
 @media (max-width: 640px) {
   .hintWallet {
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-
-  .hintWallet div {
-    padding: 6px;
-  }
-
-  .hintWallet span {
-    font-size: 0.52rem;
-  }
-
-  .hintWallet strong {
-    font-size: 0.82rem;
+    margin-bottom: 6px;
+    font-size: 0.66rem;
   }
 }

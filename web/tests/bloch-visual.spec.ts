@@ -14,13 +14,14 @@ test("gate edits wait for RUN before revealing a result", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
   await startFirstLevel(page);
 
+  const puzzleStatus = page.getByLabel("Puzzle status");
   await page.getByRole("button", { name: /^H/ }).click();
-  await expect(page.getByText("Ready to run")).toBeVisible();
-  await expect(page.getByText("Running circuit")).not.toBeVisible({ timeout: 100 });
+  await expect(page.locator(".desktopCircuit").getByLabel("Current gate sequence").getByText("H")).toBeVisible();
+  await expect(puzzleStatus.getByText("Running")).not.toBeVisible({ timeout: 100 });
   await expect(page.getByText("Solved").first()).not.toBeVisible({ timeout: 100 });
 
   await page.getByRole("button", { name: "RUN" }).click();
-  await expect(page.getByText("Running circuit")).toBeVisible();
+  await expect(puzzleStatus.getByText("Running")).toBeVisible();
   await expect(page.getByText("Solved").first()).not.toBeVisible({ timeout: 100 });
 });
 

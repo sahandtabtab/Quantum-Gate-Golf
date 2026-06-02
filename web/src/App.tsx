@@ -16,6 +16,7 @@ const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
 const HINT_COST = 220;
+const AUDIO_VOLUME_MULTIPLIER = 2;
 const CELEBRATION_BITS = Array.from({ length: 18 }, (_, index) => ({
   delay: `${(index % 6) * 70}ms`,
   rotation: `${index * 37}deg`,
@@ -50,7 +51,7 @@ export default function App() {
   const [replayNonce, setReplayNonce] = useState(0);
   const [animationMode, setAnimationMode] = useState<"to-final" | "replay">("to-final");
   const [showTrajectory, setShowTrajectory] = useState(false);
-  const [animationLabel, setAnimationLabel] = useState("Idle");
+  const [, setAnimationLabel] = useState("Idle");
   const [isRunning, setIsRunning] = useState(false);
   const [resultRevealed, setResultRevealed] = useState(false);
   const [celebrationNonce, setCelebrationNonce] = useState(0);
@@ -133,7 +134,8 @@ export default function App() {
       oscillator.type = type;
       oscillator.frequency.setValueAtTime(frequency, startTime);
       gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.012);
+      const peakVolume = Math.min(volume * AUDIO_VOLUME_MULTIPLIER, 0.08);
+      gain.gain.exponentialRampToValueAtTime(peakVolume, startTime + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
       oscillator.connect(gain);
       gain.connect(audioContext.destination);
@@ -572,10 +574,6 @@ export default function App() {
 
         {renderCircuitPanel("desktopCircuit")}
 
-        <section className="floatingPanel motionPanel" aria-label="Animation status">
-          <span>Motion</span>
-          <strong>{animationLabel}</strong>
-        </section>
 
         <section className="floatingPanel readoutPanel" aria-label="Current result">
           <div>
@@ -602,7 +600,6 @@ export default function App() {
           <h2>Gate controls</h2>
           <div className="panelLevelMeta">
             <span>Level {puzzleIndex + 1} of {PUZZLES.length}</span>
-            <strong>Rank {rank} / {availableXp} XP</strong>
           </div>
         </div>
 
@@ -650,20 +647,7 @@ export default function App() {
         </section>
 
         <section className="panelSection hintBox">
-          <div className="hintWallet" aria-label="Hint budget">
-            <div>
-              <span>Rank</span>
-              <strong>{rank}</strong>
-            </div>
-            <div>
-              <span>Available XP</span>
-              <strong>{availableXp}</strong>
-            </div>
-            <div>
-              <span>Hint cost</span>
-              <strong>{HINT_COST}</strong>
-            </div>
-          </div>
+          <p className="hintWallet">Rank {rank} / {availableXp} XP</p>
           <div className="sectionHeader">
             <h3>Gate hint</h3>
             <button
