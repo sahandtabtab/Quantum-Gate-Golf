@@ -63,6 +63,8 @@ export default function App() {
   const puzzle = PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
   const puzzleIndex = Math.max(0, PUZZLES.findIndex((item) => item.id === puzzle.id));
   const allowedGateSet = useMemo(() => new Set(puzzle.allowedGates ?? GATE_ORDER), [puzzle]);
+  const gateLimitReached = sequence.length >= puzzle.gateLimit;
+  const gateUsageText = `${sequence.length}/${puzzle.gateLimit} gates used`;
   const states = useMemo(() => sequenceStates(displaySequence), [displaySequence]);
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
@@ -484,7 +486,7 @@ export default function App() {
           </span>
           <h1>{puzzle.title}</h1>
           <p>Build a full circuit, then run it against the red target.</p>
-          <p className="objectiveMeta">Optimized solution: {puzzle.par} {puzzle.par === 1 ? "gate" : "gates"}.</p>
+          <p className="objectiveMeta">Gate limit: {puzzle.gateLimit} {puzzle.gateLimit === 1 ? "gate" : "gates"}.</p>
           {puzzle.gateSetLabel ? <p className="gateSetMeta">Gate set: {puzzle.gateSetLabel}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
@@ -538,7 +540,7 @@ export default function App() {
               Replay
             </button>
           </div>
-          <p className="gateSetNote">{puzzle.gateSetLabel ?? "All gates available"}</p>
+          <p className="gateSetNote">{puzzle.gateSetLabel ?? "All gates available"} - {gateUsageText}</p>
           <div className="gateGrid">
             {GATE_ORDER.map((gateName) => {
               const locked = !allowedGateSet.has(gateName);
@@ -546,12 +548,12 @@ export default function App() {
                 <button
                   key={gateName}
                   type="button"
-                  className={`gateButton ${locked ? "lockedGate" : ""}`}
+                  className={`gateButton ${locked ? "lockedGate" : ""} ${gateLimitReached ? "limitGate" : ""}`}
                   onClick={() => addGate(gateName)}
-                  disabled={locked || isRunning}
+                  disabled={locked || isRunning || gateLimitReached}
                 >
                   <span>{gateSymbol(gateName)}</span>
-                  <small>{locked ? "Locked this level" : STANDARD_GATES[gateName].description}</small>
+                  <small>{locked ? "Locked this level" : gateLimitReached ? "Gate limit reached" : STANDARD_GATES[gateName].description}</small>
                 </button>
               );
             })}
@@ -654,10 +656,10 @@ function LevelSelectScreen({
                 <strong>{locked ? "Locked" : record?.solved ? "Cleared" : "Open"}</strong>
               </div>
               <h2>{item.title}</h2>
-              <p>Optimized solution: {item.par} {item.par === 1 ? "gate" : "gates"}.</p>
+              <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
               {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
               <div className="levelCardStats">
-                <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.par)} XP`}</span>
+                <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
                 <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>
               </div>
             </button>
@@ -669,8 +671,8 @@ function LevelSelectScreen({
 }
 
 function xpForPuzzle(puzzle: Puzzle, gateCount: number): number {
-  const efficiencyBonus = Math.max(0, puzzle.par + 2 - gateCount) * 15;
-  return 100 + puzzle.par * 35 + efficiencyBonus;
+  const efficiencyBonus = Math.max(0, puzzle.gateLimit - gateCount) * 12;
+  return 80 + puzzle.gateLimit * 35 + efficiencyBonus;
 }
 
 function loadProgress(): ProgressState {

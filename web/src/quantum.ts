@@ -24,7 +24,7 @@ export type Puzzle = {
   id: string;
   title: string;
   targetState: QubitState;
-  par: number;
+  gateLimit: number;
   hint: string;
   allowedGates?: string[];
   gateSetLabel?: string;
@@ -61,9 +61,9 @@ export const STANDARD_GATES: Record<string, Gate> = {
     Math.PI,
   ),
   S: gate("S", "S", [[c(1), c(0)], [c(0), c(0, 1)]], "Quarter phase", [0, 0, 1], Math.PI / 2),
-  SDG: gate("SDG", "S⁻¹", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
+  SDG: gate("SDG", "S\u207b\u00b9", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
   T: gate("T", "T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase", [0, 0, 1], Math.PI / 4),
-  TDG: gate("TDG", "T⁻¹", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
+  TDG: gate("TDG", "T\u207b\u00b9", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
 };
 
 export const PUZZLES: Puzzle[] = [
@@ -71,7 +71,7 @@ export const PUZZLES: Puzzle[] = [
     id: "plus_x",
     title: "Find |+x\u27e9",
     targetState: stateFromBloch(Math.PI / 2, 0),
-    par: 1,
+    gateLimit: 1,
     hint: "The Hadamard gate sends |0\u27e9 to the +x equator.",
     allowedGates: ["H"],
     gateSetLabel: "Hadamard only",
@@ -80,7 +80,7 @@ export const PUZZLES: Puzzle[] = [
     id: "plus_y",
     title: "Find |+y\u27e9",
     targetState: stateFromBloch(Math.PI / 2, Math.PI / 2),
-    par: 2,
+    gateLimit: 2,
     hint: "Try making |+x\u27e9 first, then add a quarter phase turn.",
     allowedGates: ["H", "S", "Z", "X"],
     gateSetLabel: "Clifford gates",
@@ -89,7 +89,7 @@ export const PUZZLES: Puzzle[] = [
     id: "minus_x",
     title: "Find |-x\u27e9",
     targetState: stateFromBloch(Math.PI / 2, Math.PI),
-    par: 2,
+    gateLimit: 2,
     hint: "One route is to make |+x\u27e9, then flip its phase.",
     allowedGates: ["H", "Z", "X", "Y"],
     gateSetLabel: "Clifford gates",
@@ -98,7 +98,7 @@ export const PUZZLES: Puzzle[] = [
     id: "one",
     title: "Reach |1\u27e9",
     targetState: [c(0), c(1)],
-    par: 1,
+    gateLimit: 1,
     hint: "This is the south pole of the Bloch sphere.",
     allowedGates: ["X", "Y", "H"],
     gateSetLabel: "Bit-flip set",
@@ -107,10 +107,91 @@ export const PUZZLES: Puzzle[] = [
     id: "magic_t",
     title: "Find \u03d5 = 45 deg",
     targetState: stateFromBloch(Math.PI / 2, Math.PI / 4),
-    par: 2,
+    gateLimit: 2,
     hint: "The target is halfway between +x and +y on the equator.",
     allowedGates: ["H", "T", "S", "Z"],
     gateSetLabel: "Clifford + T",
+  },
+  {
+    id: "minus_y_inverse_s",
+    title: "Find |-y\u27e9",
+    targetState: stateFromBloch(Math.PI / 2, -Math.PI / 2),
+    gateLimit: 2,
+    hint: "Make |+x\u27e9 first, then turn backward by a quarter phase.",
+    allowedGates: ["H", "SDG", "Z", "X"],
+    gateSetLabel: "Inverse-S challenge",
+  },
+  {
+    id: "minus_magic_t",
+    title: "Find \u03d5 = -45 deg",
+    targetState: stateFromBloch(Math.PI / 2, -Math.PI / 4),
+    gateLimit: 2,
+    hint: "This is the mirror image of the 45 degree target. Use the inverse eighth-phase turn.",
+    allowedGates: ["H", "TDG", "SDG", "Z"],
+    gateSetLabel: "Inverse-T challenge",
+  },
+  {
+    id: "make_t_without_t",
+    title: "Make 45 deg without T",
+    targetState: stateFromBloch(Math.PI / 2, Math.PI / 4),
+    gateLimit: 3,
+    hint: "You do not have T directly. Combine a quarter phase with an inverse eighth phase.",
+    allowedGates: ["H", "S", "TDG"],
+    gateSetLabel: "No T gate",
+  },
+  {
+    id: "make_tdg_without_tdg",
+    title: "Make -45 deg without T\u207b\u00b9",
+    targetState: stateFromBloch(Math.PI / 2, -Math.PI / 4),
+    gateLimit: 3,
+    hint: "You do not have T\u207b\u00b9 directly. Combine an inverse quarter phase with T.",
+    allowedGates: ["H", "SDG", "T"],
+    gateSetLabel: "No T\u207b\u00b9 gate",
+  },
+  {
+    id: "t_tilt_down",
+    title: "Tilt with T",
+    targetState: targetFromSequence(["H", "T", "H"]),
+    gateLimit: 3,
+    hint: "Use H to change basis, apply T, then change basis again.",
+    allowedGates: ["H", "T"],
+    gateSetLabel: "Hadamard + T",
+  },
+  {
+    id: "tdg_tilt_up",
+    title: "Tilt with T\u207b\u00b9",
+    targetState: targetFromSequence(["H", "TDG", "H"]),
+    gateLimit: 3,
+    hint: "This is the inverse-phase version of the T tilt.",
+    allowedGates: ["H", "TDG"],
+    gateSetLabel: "Hadamard + T\u207b\u00b9",
+  },
+  {
+    id: "clifford_t_weave",
+    title: "Clifford-T weave",
+    targetState: targetFromSequence(["H", "T", "H", "S"]),
+    gateLimit: 4,
+    hint: "Alternate basis changes with phase turns. The final quarter phase matters.",
+    allowedGates: ["H", "T", "S", "SDG"],
+    gateSetLabel: "Clifford + T weave",
+  },
+  {
+    id: "inverse_weave",
+    title: "Inverse weave",
+    targetState: targetFromSequence(["H", "TDG", "H", "SDG"]),
+    gateLimit: 4,
+    hint: "Use the inverse eighth and inverse quarter phases after changing basis.",
+    allowedGates: ["H", "TDG", "SDG", "S"],
+    gateSetLabel: "Inverse phase weave",
+  },
+  {
+    id: "full_toolbox_weave",
+    title: "Full toolbox weave",
+    targetState: targetFromSequence(["H", "T", "H", "S", "TDG"]),
+    gateLimit: 5,
+    hint: "This one mixes basis changes with both forward and inverse phase turns.",
+    allowedGates: ["H", "S", "SDG", "T", "TDG"],
+    gateSetLabel: "Phase toolbox",
   },
 ];
 
@@ -153,6 +234,11 @@ export function stateFromBloch(theta: number, phi: number): QubitState {
   return normalize([c(Math.cos(theta / 2)), cMul(phase(phi), c(Math.sin(theta / 2)))]);
 }
 
+function targetFromSequence(sequence: string[]): QubitState {
+  const states = sequenceStates(sequence);
+  return states[states.length - 1] ?? INITIAL_STATE;
+}
+
 export function fidelity(state: QubitState, target: QubitState): number {
   const [a, b] = normalize(state);
   const [ta, tb] = normalize(target);
@@ -174,9 +260,9 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult
   const gateCount = sequence.length;
 
   const accuracyPoints = Math.round(1000 * accuracy);
-  const parBonus = Math.max(0, puzzle.par - gateCount) * 100;
-  const overParPenalty = Math.max(0, gateCount - puzzle.par) * 50;
   const solvedBonus = accuracy >= 0.999 ? 200 : 0;
+  const remainingGateBonus = accuracy >= 0.999 ? Math.max(0, puzzle.gateLimit - gateCount) * 75 : 0;
+  const overLimitPenalty = Math.max(0, gateCount - puzzle.gateLimit) * 250;
 
   return {
     finalState,
@@ -184,7 +270,7 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult
     targetBloch: blochVector(puzzle.targetState),
     fidelity: accuracy,
     angularErrorDegrees: angularErrorDegrees(finalState, puzzle.targetState),
-    score: Math.max(0, accuracyPoints + parBonus + solvedBonus - overParPenalty),
+    score: Math.max(0, accuracyPoints + solvedBonus + remainingGateBonus - overLimitPenalty),
   };
 }
 
