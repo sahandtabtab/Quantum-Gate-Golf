@@ -61,9 +61,9 @@ export const STANDARD_GATES: Record<string, Gate> = {
     Math.PI,
   ),
   S: gate("S", "S", [[c(1), c(0)], [c(0), c(0, 1)]], "Quarter phase", [0, 0, 1], Math.PI / 2),
-  SDG: gate("SDG", "S^{-1}", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
+  SDG: gate("SDG", "S⁻¹", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
   T: gate("T", "T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase", [0, 0, 1], Math.PI / 4),
-  TDG: gate("TDG", "T^{-1}", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
+  TDG: gate("TDG", "T⁻¹", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
 };
 
 export const PUZZLES: Puzzle[] = [

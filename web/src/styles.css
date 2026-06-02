@@ -1118,3 +1118,266 @@ select {
     height: 54svh;
   }
 }
+/* Phone play layout: compact overlays and controls without affecting desktop. */
+@media (max-width: 640px) {
+  .appShell.playMode {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+
+  .appShell.playMode .sceneStage {
+    flex: 0 0 44dvh;
+    min-height: 315px;
+    height: 44dvh;
+  }
+
+  .appShell.playMode .controlPanel {
+    flex: 1 1 auto;
+    height: 56dvh;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .statusPanel {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    padding: 8px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+  }
+
+  .statusPill {
+    height: 20px;
+    padding: 0 8px;
+    font-size: 0.58rem;
+    letter-spacing: 0.03em;
+  }
+
+  .statusPanel h1 {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.18rem;
+    line-height: 1.05;
+  }
+
+  .statusPanel p {
+    display: none;
+  }
+
+  .statusPanel .objectiveMeta {
+    display: block;
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.15;
+  }
+
+  .statusPanel .gateSetMeta {
+    display: none;
+  }
+
+  .statusPanel .compactButton {
+    min-height: 28px;
+    margin: 2px 0 0;
+    padding: 0 10px;
+    font-size: 0.72rem;
+  }
+
+  .readoutPanel {
+    left: 8px;
+    bottom: 8px;
+    width: calc(100% - 16px);
+  }
+
+  .readoutPanel div {
+    padding: 7px 8px;
+  }
+
+  .readoutPanel span {
+    font-size: 0.58rem;
+    letter-spacing: 0.07em;
+  }
+
+  .readoutPanel strong {
+    margin-top: 2px;
+    font-size: 0.88rem;
+  }
+
+  .gamePanelHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 8px;
+    margin-bottom: 8px;
+  }
+
+  .gamePanelHeader .eyebrow {
+    display: block;
+    margin: 0;
+    font-size: 0.66rem;
+  }
+
+  .gamePanelHeader h2 {
+    display: none;
+  }
+
+  .menuButton {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 28px;
+    padding: 0 9px;
+    font-size: 0.66rem;
+  }
+
+  .panelLevelMeta {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .panelLevelMeta span,
+  .panelLevelMeta strong {
+    font-size: 0.68rem;
+  }
+
+  .controlPanel .mobileCircuit {
+    order: 1;
+    margin: 0 0 8px;
+    padding: 8px;
+  }
+
+  .circuitHeader {
+    margin-bottom: 4px;
+  }
+
+  .circuitHeader h2 {
+    font-size: 0.86rem;
+  }
+
+  .inlineActions {
+    gap: 6px;
+  }
+
+  .runButton {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+
+  .textButton {
+    font-size: 0.75rem;
+  }
+
+  .circuitBoard {
+    min-height: 44px;
+    gap: 6px;
+  }
+
+  .circuitKet {
+    font-size: 0.92rem;
+  }
+
+  .circuitWire {
+    min-height: 42px;
+    padding: 0 4px;
+    gap: 6px;
+  }
+
+  .circuitEmpty {
+    padding: 2px 6px;
+    font-size: 0.7rem;
+  }
+
+  .circuitGate {
+    min-width: 30px;
+    height: 30px;
+    font-size: 0.82rem;
+  }
+
+  .circuitGateUnit {
+    grid-template-columns: 16px auto 16px;
+    grid-template-rows: auto 16px;
+    gap: 1px;
+  }
+
+  .circuitNudge,
+  .circuitRemove {
+    width: 16px;
+    height: 16px;
+    border-radius: 5px;
+    font-size: 0.6rem;
+  }
+
+  .gatesSection {
+    order: 2;
+    margin-top: 0;
+    padding-top: 8px;
+  }
+
+  .sectionHeader {
+    margin-bottom: 6px;
+  }
+
+  .panelSection h3 {
+    font-size: 1rem;
+  }
+
+  .gateSetNote {
+    margin: -2px 0 6px;
+    font-size: 0.72rem;
+  }
+
+  .gateGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .gateButton {
+    min-height: 48px;
+    padding: 6px;
+  }
+
+  .gateButton span {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .gateButton small {
+    margin-top: 3px;
+    font-size: 0.6rem;
+    line-height: 1.05;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .details,
+  .hintBox {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .appShell.playMode .sceneStage {
+    flex-basis: 42dvh;
+    min-height: 290px;
+  }
+
+  .appShell.playMode .controlPanel {
+    height: 58dvh;
+  }
+
+  .gateButton {
+    min-height: 42px;
+  }
+
+  .gateButton small {
+    display: none;
+  }
+}
