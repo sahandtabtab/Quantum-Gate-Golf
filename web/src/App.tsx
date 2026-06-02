@@ -15,6 +15,7 @@ import type { Puzzle, PuzzleResult } from "./quantum";
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
+const HINT_COST = 220;
 const CELEBRATION_BITS = Array.from({ length: 18 }, (_, index) => ({
   delay: `${(index % 6) * 70}ms`,
   rotation: `${index * 37}deg`,
@@ -29,6 +30,8 @@ type LevelRecord = {
   bestScore: number;
   bestGates: number;
   xpAwarded: number;
+  xpSpent: number;
+  hintGate?: string;
 };
 
 type ProgressState = Record<string, LevelRecord>;
@@ -48,7 +51,6 @@ export default function App() {
   const [replayNonce, setReplayNonce] = useState(0);
   const [animationMode, setAnimationMode] = useState<"to-final" | "replay">("to-final");
   const [showTrajectory, setShowTrajectory] = useState(false);
-  const [showHint, setShowHint] = useState(false);
   const [animationLabel, setAnimationLabel] = useState("Idle");
   const [isRunning, setIsRunning] = useState(false);
   const [resultRevealed, setResultRevealed] = useState(false);
@@ -65,6 +67,8 @@ export default function App() {
   const allowedGateSet = useMemo(() => new Set(puzzle.allowedGates ?? GATE_ORDER), [puzzle]);
   const gateLimitReached = sequence.length >= puzzle.gateLimit;
   const gateUsageText = `${sequence.length}/${puzzle.gateLimit} gates used`;
+  const visibleGateOrder = GATE_ORDER.filter((gateName) => allowedGateSet.has(gateName));
+  const hintedGate = progress[puzzle.id]?.hintGate;
   const states = useMemo(() => sequenceStates(displaySequence), [displaySequence]);
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
@@ -80,6 +84,11 @@ export default function App() {
     () => PUZZLES.reduce((sum, item) => sum + (progress[item.id]?.xpAwarded ?? 0), 0),
     [progress],
   );
+  const spentXp = useMemo(
+    () => PUZZLES.reduce((sum, item) => sum + (progress[item.id]?.xpSpent ?? 0), 0),
+    [progress],
+  );
+  const availableXp = Math.max(0, totalXp - spentXp);
   const rank = Math.floor(totalXp / RANK_XP) + 1;
   const xpIntoRank = totalXp % RANK_XP;
   const firstUnsolvedIndex = PUZZLES.findIndex((item) => !progress[item.id]?.solved);
@@ -153,7 +162,6 @@ export default function App() {
   const clearRun = (label: string) => {
     setSequence([]);
     setDisplaySequence([]);
-    setShowHint(false);
     setAnimationMode("to-final");
     setShowTrajectory(false);
     setAnimationLabel(label);
@@ -176,6 +184,48 @@ export default function App() {
     clearRun("Build circuit");
   };
 
+  const resetProgress = () => {
+    playClick();
+    const confirmed = window.confirm("Reset all level progress, XP, and purchased hints?");
+    if (!confirmed) {
+      return;
+    }
+
+    setProgress({});
+    setPuzzleId(PUZZLES[0]?.id ?? "plus_x");
+    setView("levels");
+    clearRun("Progress reset");
+  };
+
+  const buyGateHint = () => {
+    if (hintedGate || puzzle.solution.length === 0) {
+      return;
+    }
+
+    if (availableXp < HINT_COST) {
+      setAnimationLabel(`Need ${HINT_COST - availableXp} more XP`);
+      return;
+    }
+
+    const hintGate = pickHintGate(puzzle, sequence);
+    playClick();
+    setProgress((current) => {
+      const existing = current[puzzle.id];
+      return {
+        ...current,
+        [puzzle.id]: {
+          solved: Boolean(existing?.solved),
+          bestScore: numberOrZero(existing?.bestScore),
+          bestGates: numberOrZero(existing?.bestGates),
+          xpAwarded: numberOrZero(existing?.xpAwarded),
+          xpSpent: numberOrZero(existing?.xpSpent) + HINT_COST,
+          hintGate,
+        },
+      };
+    });
+    setAnimationLabel(`Hint revealed: ${STANDARD_GATES[hintGate]?.symbol ?? hintGate}`);
+  };
+
   const markCircuitEdited = () => {
     setResultRevealed(false);
     activeRunRef.current = null;
@@ -193,6 +243,11 @@ export default function App() {
 
   const addGate = (gateName: string) => {
     if (!allowedGateSet.has(gateName)) {
+      return;
+    }
+
+    if (sequence.length >= puzzle.gateLimit) {
+      setAnimationLabel("Gate limit reached");
       return;
     }
 
@@ -290,6 +345,8 @@ export default function App() {
           bestScore,
           bestGates,
           xpAwarded,
+          xpSpent: existing?.xpSpent ?? 0,
+          hintGate: existing?.hintGate,
         },
       };
     });
@@ -435,11 +492,14 @@ export default function App() {
       <LevelSelectScreen
         progress={progress}
         totalXp={totalXp}
+        availableXp={availableXp}
+        spentXp={spentXp}
         rank={rank}
         xpIntoRank={xpIntoRank}
         unlockedThrough={unlockedThrough}
         nextPuzzle={nextPuzzle}
         startPuzzle={startPuzzle}
+        resetProgress={resetProgress}
       />
     );
   }
@@ -527,7 +587,7 @@ export default function App() {
           <h2>Gate controls</h2>
           <div className="panelLevelMeta">
             <span>Level {puzzleIndex + 1} of {PUZZLES.length}</span>
-            <strong>Rank {rank} / {totalXp} XP</strong>
+            <strong>Rank {rank} / {availableXp} XP</strong>
           </div>
         </div>
 
@@ -542,24 +602,20 @@ export default function App() {
           </div>
           <p className="gateSetNote">{puzzle.gateSetLabel ?? "All gates available"} - {gateUsageText}</p>
           <div className="gateGrid">
-            {GATE_ORDER.map((gateName) => {
-              const locked = !allowedGateSet.has(gateName);
-              return (
-                <button
-                  key={gateName}
-                  type="button"
-                  className={`gateButton ${locked ? "lockedGate" : ""} ${gateLimitReached ? "limitGate" : ""}`}
-                  onClick={() => addGate(gateName)}
-                  disabled={locked || isRunning || gateLimitReached}
-                >
-                  <span>{gateSymbol(gateName)}</span>
-                  <small>{locked ? "Locked this level" : gateLimitReached ? "Gate limit reached" : STANDARD_GATES[gateName].description}</small>
-                </button>
-              );
-            })}
+            {visibleGateOrder.map((gateName) => (
+              <button
+                key={gateName}
+                type="button"
+                className={`gateButton ${gateLimitReached ? "limitGate" : ""}`}
+                onClick={() => addGate(gateName)}
+                disabled={isRunning || gateLimitReached}
+              >
+                <span>{gateSymbol(gateName)}</span>
+                <small>{gateLimitReached ? "Gate limit reached" : STANDARD_GATES[gateName].description}</small>
+              </button>
+            ))}
           </div>
         </section>
-
         <section className="panelSection details">
           <h3>Readout</h3>
           <dl>
@@ -580,14 +636,22 @@ export default function App() {
 
         <section className="panelSection hintBox">
           <div className="sectionHeader">
-            <h3>Hint</h3>
-            <button type="button" className="textButton" onClick={() => { playClick(); setShowHint((current) => !current); }}>
-              {showHint ? "Hide" : "Show"}
+            <h3>Gate hint</h3>
+            <button
+              type="button"
+              className="textButton"
+              onClick={buyGateHint}
+              disabled={Boolean(hintedGate) || availableXp < HINT_COST || isRunning}
+            >
+              Spend {HINT_COST} XP
             </button>
           </div>
-          {showHint ? <p>{puzzle.hint}</p> : null}
-        </section>
-      </aside>
+          {hintedGate ? (
+            <p className="hintGateReveal">Hint gate: <strong>{gateSymbol(hintedGate)}</strong></p>
+          ) : (
+            <p className="hintCostMeta">One rare hint per level. It reveals a single gate from a good solution.</p>
+          )}
+        </section>      </aside>
     </div>
   );
 }
@@ -595,19 +659,25 @@ export default function App() {
 function LevelSelectScreen({
   progress,
   totalXp,
+  availableXp,
+  spentXp,
   rank,
   xpIntoRank,
   unlockedThrough,
   nextPuzzle,
   startPuzzle,
+  resetProgress,
 }: {
   progress: ProgressState;
   totalXp: number;
+  availableXp: number;
+  spentXp: number;
   rank: number;
   xpIntoRank: number;
   unlockedThrough: number;
   nextPuzzle: Puzzle;
   startPuzzle: (puzzleId: string) => void;
+  resetProgress: () => void;
 }) {
   const completedCount = PUZZLES.filter((item) => progress[item.id]?.solved).length;
   const xpPercent = Math.round((xpIntoRank / RANK_XP) * 100);
@@ -627,12 +697,16 @@ function LevelSelectScreen({
 
         <div className="xpCard" aria-label="Player progress">
           <span>Rank {rank}</span>
-          <strong>{totalXp} XP</strong>
+          <strong>{availableXp} XP</strong>
           <div className="xpBar" aria-hidden="true">
             <span style={{ width: `${xpPercent}%` }} />
           </div>
-          <p>{xpIntoRank} / {RANK_XP} XP to next rank</p>
+          <p>{totalXp} earned / {spentXp} spent</p>
+          <small>{xpIntoRank} / {RANK_XP} XP to next rank</small>
           <small>{completedCount} / {PUZZLES.length} levels cleared</small>
+          <button type="button" className="textButton resetProgressButton" onClick={resetProgress} disabled={totalXp === 0 && completedCount === 0}>
+            Reset progress
+          </button>
         </div>
       </section>
 
@@ -670,6 +744,19 @@ function LevelSelectScreen({
   );
 }
 
+function pickHintGate(puzzle: Puzzle, sequence: string[]): string {
+  const solution = puzzle.solution;
+  if (solution.length === 0) {
+    return "H";
+  }
+
+  let prefixLength = 0;
+  while (prefixLength < sequence.length && sequence[prefixLength] === solution[prefixLength]) {
+    prefixLength += 1;
+  }
+
+  return solution[Math.min(prefixLength, solution.length - 1)] ?? solution[0];
+}
 function xpForPuzzle(puzzle: Puzzle, gateCount: number): number {
   const efficiencyBonus = Math.max(0, puzzle.gateLimit - gateCount) * 12;
   return 80 + puzzle.gateLimit * 35 + efficiencyBonus;
@@ -703,18 +790,29 @@ function saveProgress(progress: ProgressState) {
 
 function sanitizeProgress(progress: ProgressState): ProgressState {
   const validIds = new Set(PUZZLES.map((item) => item.id));
+  const validGates = new Set(GATE_ORDER);
   const sanitized: ProgressState = {};
 
   for (const [id, record] of Object.entries(progress)) {
-    if (!validIds.has(id) || !record?.solved) {
+    if (!validIds.has(id) || !record) {
+      continue;
+    }
+
+    const solved = Boolean(record.solved);
+    const hintGate = typeof record.hintGate === "string" && validGates.has(record.hintGate) ? record.hintGate : undefined;
+    const xpSpent = Math.max(0, numberOrZero(record.xpSpent));
+
+    if (!solved && !hintGate && xpSpent === 0) {
       continue;
     }
 
     sanitized[id] = {
-      solved: true,
-      bestScore: numberOrZero(record.bestScore),
-      bestGates: Math.max(1, numberOrZero(record.bestGates)),
-      xpAwarded: numberOrZero(record.xpAwarded),
+      solved,
+      bestScore: solved ? numberOrZero(record.bestScore) : 0,
+      bestGates: solved ? Math.max(1, numberOrZero(record.bestGates)) : 0,
+      xpAwarded: solved ? numberOrZero(record.xpAwarded) : 0,
+      xpSpent,
+      ...(hintGate ? { hintGate } : {}),
     };
   }
 

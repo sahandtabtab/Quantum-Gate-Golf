@@ -1390,3 +1390,31 @@ select {
 .gateButton.limitGate:not(.lockedGate) small {
   color: rgba(255, 211, 145, 0.72);
 }
+.resetProgressButton {
+  align-self: flex-start;
+  margin-top: 12px;
+  padding: 0;
+  color: #ff9bad;
+}
+
+.hintCostMeta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hintGateReveal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 211, 145, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 184, 77, 0.08);
+  color: #ffd391;
+  font-weight: 800;
+}
+
+.hintGateReveal strong {
+  color: var(--ink);
+  font-size: 1.15rem;
+}
