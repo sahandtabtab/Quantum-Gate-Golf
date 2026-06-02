@@ -31,7 +31,6 @@ type LevelRecord = {
   bestGates: number;
   xpAwarded: number;
   xpSpent: number;
-  hintGate?: string;
 };
 
 type ProgressState = Record<string, LevelRecord>;
@@ -68,7 +67,6 @@ export default function App() {
   const gateLimitReached = sequence.length >= puzzle.gateLimit;
   const gateUsageText = `${sequence.length}/${puzzle.gateLimit} gates used`;
   const visibleGateOrder = GATE_ORDER.filter((gateName) => allowedGateSet.has(gateName));
-  const hintedGate = progress[puzzle.id]?.hintGate;
   const states = useMemo(() => sequenceStates(displaySequence), [displaySequence]);
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
@@ -186,7 +184,7 @@ export default function App() {
 
   const resetProgress = () => {
     playClick();
-    const confirmed = window.confirm("Reset all level progress, XP, and purchased hints?");
+    const confirmed = window.confirm("Reset all level progress and XP?");
     if (!confirmed) {
       return;
     }
@@ -218,12 +216,6 @@ export default function App() {
       return;
     }
 
-    if (hintedGate) {
-      playClick();
-      addHintGateToCircuit(hintedGate);
-      return;
-    }
-
     if (availableXp < HINT_COST) {
       setAnimationLabel(`Need ${HINT_COST - availableXp} more XP`);
       return;
@@ -245,7 +237,6 @@ export default function App() {
           bestGates: numberOrZero(existing?.bestGates),
           xpAwarded: numberOrZero(existing?.xpAwarded),
           xpSpent: numberOrZero(existing?.xpSpent) + HINT_COST,
-          hintGate,
         },
       };
     });
@@ -371,7 +362,6 @@ export default function App() {
           bestGates,
           xpAwarded,
           xpSpent: existing?.xpSpent ?? 0,
-          hintGate: existing?.hintGate,
         },
       };
     });
@@ -660,22 +650,31 @@ export default function App() {
         </section>
 
         <section className="panelSection hintBox">
+          <div className="hintWallet" aria-label="Hint budget">
+            <div>
+              <span>Rank</span>
+              <strong>{rank}</strong>
+            </div>
+            <div>
+              <span>Available XP</span>
+              <strong>{availableXp}</strong>
+            </div>
+            <div>
+              <span>Hint cost</span>
+              <strong>{HINT_COST}</strong>
+            </div>
+          </div>
           <div className="sectionHeader">
             <h3>Gate hint</h3>
             <button
               type="button"
               className="textButton"
               onClick={buyGateHint}
-              disabled={(!hintedGate && availableXp < HINT_COST) || gateLimitReached || isRunning}
+              disabled={availableXp < HINT_COST || gateLimitReached || isRunning}
             >
-              {hintedGate ? "Add hint" : `Spend ${HINT_COST} XP`}
+              Spend {HINT_COST} XP
             </button>
           </div>
-          {hintedGate ? (
-            <p className="hintGateReveal">Purchased hint: <strong>{gateSymbol(hintedGate)}</strong>. Add it to the circuit any time.</p>
-          ) : (
-            <p className="hintCostMeta">Spend XP to add one gate from a good solution directly to your circuit.</p>
-          )}
         </section>
       </aside>
     </div>
@@ -816,7 +815,6 @@ function saveProgress(progress: ProgressState) {
 
 function sanitizeProgress(progress: ProgressState): ProgressState {
   const validIds = new Set(PUZZLES.map((item) => item.id));
-  const validGates = new Set(GATE_ORDER);
   const sanitized: ProgressState = {};
 
   for (const [id, record] of Object.entries(progress)) {
@@ -825,10 +823,9 @@ function sanitizeProgress(progress: ProgressState): ProgressState {
     }
 
     const solved = Boolean(record.solved);
-    const hintGate = typeof record.hintGate === "string" && validGates.has(record.hintGate) ? record.hintGate : undefined;
     const xpSpent = Math.max(0, numberOrZero(record.xpSpent));
 
-    if (!solved && !hintGate && xpSpent === 0) {
+    if (!solved && xpSpent === 0) {
       continue;
     }
 
@@ -838,7 +835,6 @@ function sanitizeProgress(progress: ProgressState): ProgressState {
       bestGates: solved ? Math.max(1, numberOrZero(record.bestGates)) : 0,
       xpAwarded: solved ? numberOrZero(record.xpAwarded) : 0,
       xpSpent,
-      ...(hintGate ? { hintGate } : {}),
     };
   }
 
