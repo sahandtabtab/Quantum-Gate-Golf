@@ -1,27 +1,28 @@
 # Quantum Gate Golf
 
-A prototype game about learning single-qubit gates by building short quantum circuits and watching their action on the Bloch sphere.
+Quantum Gate Golf is a browser game for learning single-qubit gates. Build a short quantum circuit, run it, and watch the state move on a Bloch sphere toward the target.
 
-The repo currently has two layers:
+Play it here:
 
-1. A small Python model for the gate math and the original Matplotlib animation.
-2. A browser prototype in `web/` built with React, TypeScript, Vite, and Three.js.
+https://sahandtabtab.github.io/Quantum-Gate-Golf/
 
 ## Game Loop
 
-In the browser version, each level gives you a target state on the Bloch sphere.
+Each level gives you a target state and a maximum number of gates.
 
 1. Pick a level from the level menu.
 2. Build a circuit from the available gates.
-3. Reorder gates in the circuit by dragging them, or use the small left/right controls.
+3. Reorder gates by dragging them, or use the small left/right controls.
 4. Remove individual gates with the `x` control.
 5. Press `RUN` to animate the full circuit.
-6. The result is revealed near the end of the animation.
-7. Clearing a level awards XP and unlocks the next level.
+6. Clear the level by landing on the target state within the gate limit.
+7. Earn XP, unlock the next level, and spend XP on rare gate hints.
 
-Some levels lock gates to create different challenge types, such as Hadamard-only, Clifford-only, bit-flip, and Clifford+T puzzles.
+Hints add one gate from a good solution directly into your circuit. Progress and XP are stored locally in the browser, and can be reset from the level menu.
 
-## Browser Prototype
+## Development
+
+The web app lives in `web/` and is built with React, TypeScript, Vite, and Three.js.
 
 Install dependencies:
 
@@ -50,51 +51,6 @@ Run the Playwright visual checks:
 npm run test:visual
 ```
 
-## Python Prototype
+## Deployment
 
-List the available gates and starter puzzles:
-
-```bash
-python example.py --list
-```
-
-Attempt the default `plus_y` puzzle:
-
-```bash
-python example.py H S
-```
-
-Try a specific puzzle:
-
-```bash
-python example.py --puzzle magic_t H T
-```
-
-Open the Matplotlib Bloch sphere animation:
-
-```bash
-python animate_bloch.py H S
-```
-
-Verify the animation script without opening a window:
-
-```bash
-python animate_bloch.py --no-show H S
-```
-
-Run the Python tests:
-
-```bash
-python -m unittest
-```
-
-## Notes
-
-The browser app is the main game direction now. The Python files are still useful as a compact reference for the math and a quick sanity check for gate behavior.
-
-Good next steps:
-
-- add more authored levels with interesting gate restrictions
-- add persistent level completion UI polish
-- tune the mobile layout after more phone testing
-- introduce multi-qubit ideas later with a different visualization
+The project is deployed with GitHub Pages. Pushing to `main` triggers the GitHub Actions workflow, builds the Vite app, and publishes the production site.

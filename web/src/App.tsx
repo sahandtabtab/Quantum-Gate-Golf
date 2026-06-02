@@ -197,8 +197,30 @@ export default function App() {
     clearRun("Progress reset");
   };
 
+  const addHintGateToCircuit = (gateName: string) => {
+    if (sequence.length >= puzzle.gateLimit) {
+      setAnimationLabel("Clear space in the circuit first");
+      return false;
+    }
+
+    if (!allowedGateSet.has(gateName)) {
+      setAnimationLabel("No usable hint for this level");
+      return false;
+    }
+
+    updateDraftSequence((current) => [...current, gateName]);
+    setAnimationLabel(`Hint added: ${STANDARD_GATES[gateName]?.symbol ?? gateName}`);
+    return true;
+  };
+
   const buyGateHint = () => {
-    if (hintedGate || puzzle.solution.length === 0) {
+    if (isRunning || puzzle.solution.length === 0) {
+      return;
+    }
+
+    if (hintedGate) {
+      playClick();
+      addHintGateToCircuit(hintedGate);
       return;
     }
 
@@ -208,6 +230,10 @@ export default function App() {
     }
 
     const hintGate = pickHintGate(puzzle, sequence);
+    if (!addHintGateToCircuit(hintGate)) {
+      return;
+    }
+
     playClick();
     setProgress((current) => {
       const existing = current[puzzle.id];
@@ -223,7 +249,6 @@ export default function App() {
         },
       };
     });
-    setAnimationLabel(`Hint revealed: ${STANDARD_GATES[hintGate]?.symbol ?? hintGate}`);
   };
 
   const markCircuitEdited = () => {
@@ -641,17 +666,18 @@ export default function App() {
               type="button"
               className="textButton"
               onClick={buyGateHint}
-              disabled={Boolean(hintedGate) || availableXp < HINT_COST || isRunning}
+              disabled={(!hintedGate && availableXp < HINT_COST) || gateLimitReached || isRunning}
             >
-              Spend {HINT_COST} XP
+              {hintedGate ? "Add hint" : `Spend ${HINT_COST} XP`}
             </button>
           </div>
           {hintedGate ? (
-            <p className="hintGateReveal">Hint gate: <strong>{gateSymbol(hintedGate)}</strong></p>
+            <p className="hintGateReveal">Purchased hint: <strong>{gateSymbol(hintedGate)}</strong>. Add it to the circuit any time.</p>
           ) : (
-            <p className="hintCostMeta">One rare hint per level. It reveals a single gate from a good solution.</p>
+            <p className="hintCostMeta">Spend XP to add one gate from a good solution directly to your circuit.</p>
           )}
-        </section>      </aside>
+        </section>
+      </aside>
     </div>
   );
 }
