@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, DragEvent } from "react";
 import BlochScene from "./BlochScene";
 import {
   PUZZLES,
@@ -10,7 +10,7 @@ import {
   formatState,
   sequenceStates,
 } from "./quantum";
-import type { Puzzle } from "./quantum";
+import type { Puzzle, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
@@ -33,25 +33,47 @@ type LevelRecord = {
 
 type ProgressState = Record<string, LevelRecord>;
 
+type ActiveRun = {
+  token: number;
+  puzzle: Puzzle;
+  sequence: string[];
+  result: PuzzleResult;
+};
+
 export default function App() {
   const [view, setView] = useState<GameView>("levels");
   const [puzzleId, setPuzzleId] = useState(PUZZLES[0]?.id ?? "plus_x");
   const [sequence, setSequence] = useState<string[]>([]);
+  const [displaySequence, setDisplaySequence] = useState<string[]>([]);
   const [replayNonce, setReplayNonce] = useState(0);
   const [animationMode, setAnimationMode] = useState<"to-final" | "replay">("to-final");
   const [showTrajectory, setShowTrajectory] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [animationLabel, setAnimationLabel] = useState("Idle");
+  const [isRunning, setIsRunning] = useState(false);
+  const [resultRevealed, setResultRevealed] = useState(false);
   const [celebrationNonce, setCelebrationNonce] = useState(0);
   const [progress, setProgress] = useState<ProgressState>(() => loadProgress());
-  const previousSolvedRef = useRef(false);
+  const [draggedGateIndex, setDraggedGateIndex] = useState<number | null>(null);
+  const revealedRunKeyRef = useRef("");
+  const activeRunRef = useRef<ActiveRun | null>(null);
+  const runTokenRef = useRef(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const puzzle = PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
   const puzzleIndex = Math.max(0, PUZZLES.findIndex((item) => item.id === puzzle.id));
-  const states = useMemo(() => sequenceStates(sequence), [sequence]);
+  const allowedGateSet = useMemo(() => new Set(puzzle.allowedGates ?? GATE_ORDER), [puzzle]);
+  const states = useMemo(() => sequenceStates(displaySequence), [displaySequence]);
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
-  const result = useMemo(() => evaluatePuzzle(puzzle, sequence), [puzzle, sequence]);
-  const solved = result.fidelity >= 0.999;
+  const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
+  const solved = resultRevealed && result.fidelity >= 0.999;
+  const statusText = solved
+    ? "Solved"
+    : isRunning && !resultRevealed
+      ? "Running"
+      : resultRevealed
+        ? "Try again"
+        : "Build circuit";
   const totalXp = useMemo(
     () => PUZZLES.reduce((sum, item) => sum + (progress[item.id]?.xpAwarded ?? 0), 0),
     [progress],
@@ -61,45 +83,87 @@ export default function App() {
   const firstUnsolvedIndex = PUZZLES.findIndex((item) => !progress[item.id]?.solved);
   const unlockedThrough = firstUnsolvedIndex === -1 ? PUZZLES.length - 1 : firstUnsolvedIndex;
   const nextPuzzle = firstUnsolvedIndex === -1 ? PUZZLES[0] : PUZZLES[firstUnsolvedIndex];
+  const nextLevel = PUZZLES[puzzleIndex + 1];
 
   useEffect(() => {
     saveProgress(progress);
   }, [progress]);
 
-  useEffect(() => {
-    if (solved && !previousSolvedRef.current && sequence.length > 0) {
-      setCelebrationNonce((current) => current + 1);
-      setProgress((current) => {
-        const existing = current[puzzle.id];
-        const bestGates = Math.min(existing?.bestGates ?? Number.POSITIVE_INFINITY, sequence.length);
-        const bestScore = Math.max(existing?.bestScore ?? 0, result.score);
-        const xpAwarded = existing?.xpAwarded ?? xpForPuzzle(puzzle, sequence.length);
-
-        return {
-          ...current,
-          [puzzle.id]: {
-            solved: true,
-            bestScore,
-            bestGates,
-            xpAwarded,
-          },
-        };
-      });
+  const getAudioContext = () => {
+    if (typeof window === "undefined") {
+      return null;
     }
-    previousSolvedRef.current = solved;
-  }, [puzzle.id, puzzle.par, result.score, sequence.length, solved]);
+
+    const AudioContextClass =
+      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) {
+      return null;
+    }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+
+    if (audioContextRef.current.state === "suspended") {
+      void audioContextRef.current.resume();
+    }
+
+    return audioContextRef.current;
+  };
+
+  const playTone = (frequency: number, duration: number, volume: number, delay = 0, type: OscillatorType = "sine") => {
+    try {
+      const audioContext = getAudioContext();
+      if (!audioContext) {
+        return;
+      }
+
+      const startTime = audioContext.currentTime + delay;
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration + 0.02);
+    } catch {
+      // Audio cues are decorative; gameplay should never depend on them.
+    }
+  };
+
+  const playClick = () => playTone(420, 0.045, 0.018);
+  const playWin = () => {
+    playTone(523.25, 0.1, 0.025, 0);
+    playTone(659.25, 0.12, 0.022, 0.08);
+    playTone(783.99, 0.18, 0.02, 0.17);
+  };
+  const playLoss = () => {
+    playTone(246.94, 0.12, 0.018, 0, "triangle");
+    playTone(196, 0.16, 0.016, 0.11, "triangle");
+  };
+
+  const gateSymbol = (gateName: string) => STANDARD_GATES[gateName]?.symbol ?? gateName;
 
   const clearRun = (label: string) => {
     setSequence([]);
+    setDisplaySequence([]);
     setShowHint(false);
     setAnimationMode("to-final");
     setShowTrajectory(false);
     setAnimationLabel(label);
-    previousSolvedRef.current = false;
+    setIsRunning(false);
+    setResultRevealed(false);
+    revealedRunKeyRef.current = "";
+    activeRunRef.current = null;
     setReplayNonce((current) => current + 1);
   };
 
   const startPuzzle = (nextPuzzleId: string) => {
+    playClick();
     const nextIndex = PUZZLES.findIndex((item) => item.id === nextPuzzleId);
     if (nextIndex > unlockedThrough) {
       return;
@@ -107,59 +171,254 @@ export default function App() {
 
     setPuzzleId(nextPuzzleId);
     setView("play");
-    clearRun("New target");
+    clearRun("Build circuit");
+  };
+
+  const markCircuitEdited = () => {
+    setResultRevealed(false);
+    activeRunRef.current = null;
+    setAnimationLabel("Ready to run");
+  };
+
+  const updateDraftSequence = (updater: (current: string[]) => string[]) => {
+    if (isRunning) {
+      return;
+    }
+
+    setSequence((current) => updater(current));
+    markCircuitEdited();
   };
 
   const addGate = (gateName: string) => {
-    setSequence((current) => [...current, gateName]);
-    setAnimationMode("to-final");
-    setShowTrajectory(true);
-    setAnimationLabel(`Animating ${gateName}`);
-    setReplayNonce((current) => current + 1);
+    if (!allowedGateSet.has(gateName)) {
+      return;
+    }
+
+    playClick();
+    updateDraftSequence((current) => [...current, gateName]);
   };
 
   const undo = () => {
-    setSequence((current) => current.slice(0, -1));
-    setAnimationMode("to-final");
-    setShowTrajectory(false);
-    setAnimationLabel("Animating undo");
-    previousSolvedRef.current = false;
-    setReplayNonce((current) => current + 1);
+    playClick();
+    updateDraftSequence((current) => current.slice(0, -1));
   };
 
   const reset = () => {
+    playClick();
     clearRun("Reset to |0\u27e9");
   };
 
-  const replay = () => {
+  const removeGate = (index: number) => {
+    playClick();
+    updateDraftSequence((current) => current.filter((_, gateIndex) => gateIndex !== index));
+  };
+
+  const moveGate = (index: number, direction: -1 | 1) => {
+    playClick();
+    updateDraftSequence((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) {
+        return current;
+      }
+
+      const next = [...current];
+      const [gate] = next.splice(index, 1);
+      next.splice(nextIndex, 0, gate);
+      return next;
+    });
+  };
+
+  const handleGateDragStart = (event: DragEvent<HTMLSpanElement>, index: number) => {
+    setDraggedGateIndex(index);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const handleGateDrop = (event: DragEvent<HTMLSpanElement>, dropIndex: number) => {
+    event.preventDefault();
+    const sourceIndex = draggedGateIndex ?? Number(event.dataTransfer.getData("text/plain"));
+    setDraggedGateIndex(null);
+
+    if (!Number.isInteger(sourceIndex) || sourceIndex === dropIndex) {
+      return;
+    }
+
+    updateDraftSequence((current) => {
+      if (sourceIndex < 0 || sourceIndex >= current.length) {
+        return current;
+      }
+
+      const next = [...current];
+      const [gate] = next.splice(sourceIndex, 1);
+      next.splice(dropIndex, 0, gate);
+      return next;
+    });
+  };
+
+  const revealRunResult = () => {
+    const activeRun = activeRunRef.current;
+    if (!activeRun) {
+      return;
+    }
+
+    const runKey = String(activeRun.token);
+    if (revealedRunKeyRef.current === runKey) {
+      return;
+    }
+
+    revealedRunKeyRef.current = runKey;
+    setResultRevealed(true);
+    if (activeRun.result.fidelity < 0.999) {
+      playLoss();
+      return;
+    }
+
+    playWin();
+    setCelebrationNonce((current) => current + 1);
+    setProgress((current) => {
+      const existing = current[activeRun.puzzle.id];
+      const bestGates = Math.min(existing?.bestGates ?? Number.POSITIVE_INFINITY, activeRun.sequence.length);
+      const bestScore = Math.max(existing?.bestScore ?? 0, activeRun.result.score);
+      const xpAwarded = existing?.xpAwarded ?? xpForPuzzle(activeRun.puzzle, activeRun.sequence.length);
+
+      return {
+        ...current,
+        [activeRun.puzzle.id]: {
+          solved: true,
+          bestScore,
+          bestGates,
+          xpAwarded,
+        },
+      };
+    });
+  };
+
+
+  const runCircuit = () => {
+    if (sequence.length === 0 || isRunning) {
+      setAnimationLabel("Add gates first");
+      return;
+    }
+
+    playClick();
+    const runSequence = [...sequence];
+    const token = runTokenRef.current + 1;
+    runTokenRef.current = token;
+    activeRunRef.current = {
+      token,
+      puzzle,
+      sequence: runSequence,
+      result: evaluatePuzzle(puzzle, runSequence),
+    };
+
+    setDisplaySequence(runSequence);
     setAnimationMode("replay");
-    setShowTrajectory(sequence.length > 0);
-    setAnimationLabel(sequence.length === 0 ? "Still at |0\u27e9" : "Replaying sequence");
+    setShowTrajectory(true);
+    setAnimationLabel("Running circuit");
+    setIsRunning(true);
+    setResultRevealed(false);
+    revealedRunKeyRef.current = "";
     setReplayNonce((current) => current + 1);
   };
 
+  const replay = () => {
+    if (displaySequence.length === 0 || isRunning) {
+      setAnimationLabel("Run a circuit first");
+      return;
+    }
+
+    playClick();
+    const replaySequence = [...displaySequence];
+    const token = runTokenRef.current + 1;
+    runTokenRef.current = token;
+    activeRunRef.current = {
+      token,
+      puzzle,
+      sequence: replaySequence,
+      result: evaluatePuzzle(puzzle, replaySequence),
+    };
+
+    setAnimationMode("replay");
+    setShowTrajectory(true);
+    setAnimationLabel("Replaying last run");
+    setIsRunning(true);
+    setResultRevealed(false);
+    revealedRunKeyRef.current = "";
+    setReplayNonce((current) => current + 1);
+  };
+
+  const handleAnimationComplete = () => {
+    if (!activeRunRef.current) {
+      return;
+    }
+
+    setAnimationLabel("Idle");
+    setIsRunning(false);
+  };
+
+  const readoutValue = (value: string) => (resultRevealed ? value : "--");
+
   const renderCircuitPanel = (className: string) => (
-    <section className={`floatingPanel circuitPanel ${className}`} aria-label="Current quantum circuit">
+    <section className={`floatingPanel circuitPanel ${className}`} aria-label="Draft quantum circuit">
       <div className="sectionHeader circuitHeader">
         <h2>Circuit</h2>
         <div className="inlineActions">
-          <button type="button" className="textButton" onClick={undo} disabled={sequence.length === 0}>
+          <button type="button" className="runButton" onClick={runCircuit} disabled={sequence.length === 0 || isRunning}>
+            RUN
+          </button>
+          <button type="button" className="textButton" onClick={undo} disabled={sequence.length === 0 || isRunning}>
             Undo
           </button>
-          <button type="button" className="textButton" onClick={reset} disabled={sequence.length === 0}>
+          <button type="button" className="textButton" onClick={reset} disabled={(sequence.length === 0 && displaySequence.length === 0) || isRunning}>
             Reset
           </button>
         </div>
       </div>
       <div className={`circuitBoard ${sequence.length === 0 ? "empty" : ""}`}>
         <span className="circuitKet">{"|0\u27e9"}</span>
-        <div className="circuitWire" aria-label="Current gate sequence">
+        <div className={`circuitWire ${sequence.length > 0 ? "filled" : ""}`} aria-label="Current gate sequence">
           {sequence.length === 0 ? (
             <span className="circuitEmpty">add gates</span>
           ) : (
             sequence.map((gateName, index) => (
-              <span className="circuitGate" key={`${gateName}-${index}`}>
-                {gateName}
+              <span
+                className={`circuitGateUnit ${draggedGateIndex === index ? "dragging" : ""}`}
+                draggable={!isRunning && sequence.length > 1}
+                key={`${gateName}-${index}`}
+                onDragEnd={() => setDraggedGateIndex(null)}
+                onDragOver={(event) => event.preventDefault()}
+                onDragStart={(event) => handleGateDragStart(event, index)}
+                onDrop={(event) => handleGateDrop(event, index)}
+                aria-label={`Gate ${index + 1}: ${gateName}`}
+              >
+                <button
+                  type="button"
+                  className="circuitNudge"
+                  onClick={() => moveGate(index, -1)}
+                  disabled={index === 0 || isRunning}
+                  aria-label={`Move ${gateName} left`}
+                >
+                  &lt;
+                </button>
+                <span className="circuitGate">{gateSymbol(gateName)}</span>
+                <button
+                  type="button"
+                  className="circuitRemove"
+                  onClick={() => removeGate(index)}
+                  disabled={isRunning}
+                  aria-label={`Remove ${gateName}`}
+                >
+                  x
+                </button>
+                <button
+                  type="button"
+                  className="circuitNudge"
+                  onClick={() => moveGate(index, 1)}
+                  disabled={index === sequence.length - 1 || isRunning}
+                  aria-label={`Move ${gateName} right`}
+                >
+                  &gt;
+                </button>
               </span>
             ))
           )}
@@ -188,13 +447,15 @@ export default function App() {
       <main className="sceneStage">
         <BlochScene
           keyVectors={keyVectors}
+          gateSequence={displaySequence}
           targetVector={result.targetBloch}
           animationMode={animationMode}
           showTrajectory={showTrajectory}
           solved={solved}
           celebrationNonce={celebrationNonce}
           replayNonce={replayNonce}
-          onAnimationComplete={() => setAnimationLabel("Idle")}
+          onAnimationNearEnd={revealRunResult}
+          onAnimationComplete={handleAnimationComplete}
         />
 
         {celebrationNonce > 0 ? (
@@ -218,10 +479,18 @@ export default function App() {
         ) : null}
 
         <section className="floatingPanel statusPanel" aria-label="Puzzle status">
-          <span className={`statusPill ${solved ? "solved" : ""}`}>{solved ? "Solved" : "In progress"}</span>
+          <span className={`statusPill ${solved ? "solved" : resultRevealed ? "failed" : isRunning ? "running" : ""}`}>
+            {statusText}
+          </span>
           <h1>{puzzle.title}</h1>
-          <p>Match the red target with as few gates as you can.</p>
+          <p>Build a full circuit, then run it against the red target.</p>
           <p className="objectiveMeta">Optimized solution: {puzzle.par} {puzzle.par === 1 ? "gate" : "gates"}.</p>
+          {puzzle.gateSetLabel ? <p className="gateSetMeta">Gate set: {puzzle.gateSetLabel}</p> : null}
+          {solved && nextLevel ? (
+            <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
+              Next level
+            </button>
+          ) : null}
         </section>
 
         {renderCircuitPanel("desktopCircuit")}
@@ -234,25 +503,25 @@ export default function App() {
         <section className="floatingPanel readoutPanel" aria-label="Current result">
           <div>
             <span>Fidelity</span>
-            <strong>{(result.fidelity * 100).toFixed(2)}%</strong>
+            <strong>{readoutValue(`${(result.fidelity * 100).toFixed(2)}%`)}</strong>
           </div>
           <div>
             <span>Error</span>
-            <strong>{result.angularErrorDegrees.toFixed(1)} deg</strong>
+            <strong>{readoutValue(`${result.angularErrorDegrees.toFixed(1)} deg`)}</strong>
           </div>
           <div>
             <span>Score</span>
-            <strong>{result.score}</strong>
+            <strong>{readoutValue(String(result.score))}</strong>
           </div>
         </section>
       </main>
 
       <aside className="controlPanel">
         <div className="panelHeader gamePanelHeader">
-          <button type="button" className="textButton levelBackButton" onClick={() => setView("levels")}>
-            Levels
-          </button>
           <p className="eyebrow">Quantum Gate Golf</p>
+          <button type="button" className="menuButton" onClick={() => { playClick(); setView("levels"); }}>
+            Main menu
+          </button>
           <h2>Gate controls</h2>
           <div className="panelLevelMeta">
             <span>Level {puzzleIndex + 1} of {PUZZLES.length}</span>
@@ -265,17 +534,27 @@ export default function App() {
         <section className="panelSection gatesSection">
           <div className="sectionHeader">
             <h3>Gates</h3>
-            <button type="button" className="textButton" onClick={replay}>
+            <button type="button" className="textButton" onClick={replay} disabled={displaySequence.length === 0 || isRunning}>
               Replay
             </button>
           </div>
+          <p className="gateSetNote">{puzzle.gateSetLabel ?? "All gates available"}</p>
           <div className="gateGrid">
-            {GATE_ORDER.map((gateName) => (
-              <button key={gateName} type="button" className="gateButton" onClick={() => addGate(gateName)}>
-                <span>{gateName}</span>
-                <small>{STANDARD_GATES[gateName].description}</small>
-              </button>
-            ))}
+            {GATE_ORDER.map((gateName) => {
+              const locked = !allowedGateSet.has(gateName);
+              return (
+                <button
+                  key={gateName}
+                  type="button"
+                  className={`gateButton ${locked ? "lockedGate" : ""}`}
+                  onClick={() => addGate(gateName)}
+                  disabled={locked || isRunning}
+                >
+                  <span>{gateSymbol(gateName)}</span>
+                  <small>{locked ? "Locked this level" : STANDARD_GATES[gateName].description}</small>
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -288,11 +567,11 @@ export default function App() {
             </div>
             <div>
               <dt>Current</dt>
-              <dd className="mathReadout">{formatAngles(result.finalBloch)}</dd>
+              <dd className="mathReadout">{resultRevealed ? formatAngles(result.finalBloch) : "Run circuit to reveal."}</dd>
             </div>
             <div>
               <dt>State</dt>
-              <dd>{formatState(result.finalState)}</dd>
+              <dd>{resultRevealed ? formatState(result.finalState) : "Run circuit to reveal."}</dd>
             </div>
           </dl>
         </section>
@@ -300,7 +579,7 @@ export default function App() {
         <section className="panelSection hintBox">
           <div className="sectionHeader">
             <h3>Hint</h3>
-            <button type="button" className="textButton" onClick={() => setShowHint((current) => !current)}>
+            <button type="button" className="textButton" onClick={() => { playClick(); setShowHint((current) => !current); }}>
               {showHint ? "Hide" : "Show"}
             </button>
           </div>
@@ -335,8 +614,7 @@ function LevelSelectScreen({
     <main className="levelSelectScreen">
       <section className="levelHero">
         <div className="levelHeroCopy">
-          <p className="eyebrow">Quantum Gate Golf</p>
-          <h1>Pick a gate challenge</h1>
+          <h1>QUANTUM GATE GOLF</h1>
           <p>
             Clear each target with short quantum circuits. New levels unlock as you solve the previous one.
           </p>
@@ -377,6 +655,7 @@ function LevelSelectScreen({
               </div>
               <h2>{item.title}</h2>
               <p>Optimized solution: {item.par} {item.par === 1 ? "gate" : "gates"}.</p>
+              {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
               <div className="levelCardStats">
                 <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.par)} XP`}</span>
                 <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>
@@ -443,3 +722,8 @@ function sanitizeProgress(progress: ProgressState): ProgressState {
 function numberOrZero(value: number): number {
   return Number.isFinite(value) ? value : 0;
 }
+
+
+
+
+

@@ -7,10 +7,17 @@ export type QubitState = [Complex, Complex];
 export type Matrix2 = [[Complex, Complex], [Complex, Complex]];
 export type Vec3 = [number, number, number];
 
+export type GateRotation = {
+  axis: Vec3;
+  angle: number;
+};
+
 export type Gate = {
   name: string;
+  symbol: string;
   matrix: Matrix2;
   description: string;
+  rotation: GateRotation;
 };
 
 export type Puzzle = {
@@ -19,6 +26,8 @@ export type Puzzle = {
   targetState: QubitState;
   par: number;
   hint: string;
+  allowedGates?: string[];
+  gateSetLabel?: string;
 };
 
 export type PuzzleResult = {
@@ -36,22 +45,25 @@ const SQRT_HALF = 1 / Math.sqrt(2);
 export const INITIAL_STATE: QubitState = [c(1), c(0)];
 
 export const STANDARD_GATES: Record<string, Gate> = {
-  I: gate("I", [[c(1), c(0)], [c(0), c(1)]], "Identity"),
-  X: gate("X", [[c(0), c(1)], [c(1), c(0)]], "Bit flip"),
-  Y: gate("Y", [[c(0), c(0, -1)], [c(0, 1), c(0)]], "Bit-and-phase flip"),
-  Z: gate("Z", [[c(1), c(0)], [c(0), c(-1)]], "Phase flip"),
+  I: gate("I", "I", [[c(1), c(0)], [c(0), c(1)]], "Identity", [0, 0, 1], 0),
+  X: gate("X", "X", [[c(0), c(1)], [c(1), c(0)]], "Bit flip", [1, 0, 0], Math.PI),
+  Y: gate("Y", "Y", [[c(0), c(0, -1)], [c(0, 1), c(0)]], "Bit-and-phase flip", [0, 1, 0], Math.PI),
+  Z: gate("Z", "Z", [[c(1), c(0)], [c(0), c(-1)]], "Phase flip", [0, 0, 1], Math.PI),
   H: gate(
+    "H",
     "H",
     [
       [c(SQRT_HALF), c(SQRT_HALF)],
       [c(SQRT_HALF), c(-SQRT_HALF)],
     ],
     "Hadamard",
+    [SQRT_HALF, 0, SQRT_HALF],
+    Math.PI,
   ),
-  S: gate("S", [[c(1), c(0)], [c(0), c(0, 1)]], "Quarter phase"),
-  SDG: gate("SDG", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S"),
-  T: gate("T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase"),
-  TDG: gate("TDG", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T"),
+  S: gate("S", "S", [[c(1), c(0)], [c(0), c(0, 1)]], "Quarter phase", [0, 0, 1], Math.PI / 2),
+  SDG: gate("SDG", "S^{-1}", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
+  T: gate("T", "T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase", [0, 0, 1], Math.PI / 4),
+  TDG: gate("TDG", "T^{-1}", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
 };
 
 export const PUZZLES: Puzzle[] = [
@@ -61,6 +73,8 @@ export const PUZZLES: Puzzle[] = [
     targetState: stateFromBloch(Math.PI / 2, 0),
     par: 1,
     hint: "The Hadamard gate sends |0\u27e9 to the +x equator.",
+    allowedGates: ["H"],
+    gateSetLabel: "Hadamard only",
   },
   {
     id: "plus_y",
@@ -68,6 +82,8 @@ export const PUZZLES: Puzzle[] = [
     targetState: stateFromBloch(Math.PI / 2, Math.PI / 2),
     par: 2,
     hint: "Try making |+x\u27e9 first, then add a quarter phase turn.",
+    allowedGates: ["H", "S", "Z", "X"],
+    gateSetLabel: "Clifford gates",
   },
   {
     id: "minus_x",
@@ -75,6 +91,8 @@ export const PUZZLES: Puzzle[] = [
     targetState: stateFromBloch(Math.PI / 2, Math.PI),
     par: 2,
     hint: "One route is to make |+x\u27e9, then flip its phase.",
+    allowedGates: ["H", "Z", "X", "Y"],
+    gateSetLabel: "Clifford gates",
   },
   {
     id: "one",
@@ -82,6 +100,8 @@ export const PUZZLES: Puzzle[] = [
     targetState: [c(0), c(1)],
     par: 1,
     hint: "This is the south pole of the Bloch sphere.",
+    allowedGates: ["X", "Y", "H"],
+    gateSetLabel: "Bit-flip set",
   },
   {
     id: "magic_t",
@@ -89,6 +109,8 @@ export const PUZZLES: Puzzle[] = [
     targetState: stateFromBloch(Math.PI / 2, Math.PI / 4),
     par: 2,
     hint: "The target is halfway between +x and +y on the equator.",
+    allowedGates: ["H", "T", "S", "Z"],
+    gateSetLabel: "Clifford + T",
   },
 ];
 
@@ -97,11 +119,11 @@ export function sequenceStates(sequence: string[]): QubitState[] {
   const states = [state];
 
   for (const gateName of sequence) {
-    const gate = STANDARD_GATES[gateName.toUpperCase()];
-    if (!gate) {
+    const selectedGate = STANDARD_GATES[gateName.toUpperCase()];
+    if (!selectedGate) {
       throw new Error(`Unknown gate: ${gateName}`);
     }
-    state = applyGate(state, gate);
+    state = applyGate(state, selectedGate);
     states.push(state);
   }
 
@@ -164,6 +186,27 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult
     angularErrorDegrees: angularErrorDegrees(finalState, puzzle.targetState),
     score: Math.max(0, accuracyPoints + parBonus + solvedBonus - overParPenalty),
   };
+}
+
+export function gateRotation(gateName: string): GateRotation {
+  const selectedGate = STANDARD_GATES[gateName.toUpperCase()];
+  if (!selectedGate) {
+    throw new Error(`Unknown gate: ${gateName}`);
+  }
+  return selectedGate.rotation;
+}
+
+export function rotateBlochVector(vector: Vec3, rotation: GateRotation, amount = 1): Vec3 {
+  const axis = normalize3(rotation.axis);
+  const angle = rotation.angle * amount;
+  const cosAngle = Math.cos(angle);
+  const sinAngle = Math.sin(angle);
+  const axisDotVector = dot(axis, vector);
+  return normalize3([
+    vector[0] * cosAngle + cross(axis, vector)[0] * sinAngle + axis[0] * axisDotVector * (1 - cosAngle),
+    vector[1] * cosAngle + cross(axis, vector)[1] * sinAngle + axis[1] * axisDotVector * (1 - cosAngle),
+    vector[2] * cosAngle + cross(axis, vector)[2] * sinAngle + axis[2] * axisDotVector * (1 - cosAngle),
+  ]);
 }
 
 export function slerpUnit(start: Vec3, end: Vec3, amount: number): Vec3 {
@@ -233,8 +276,8 @@ function c(re: number, im = 0): Complex {
   return { re, im };
 }
 
-function gate(name: string, matrix: Matrix2, description: string): Gate {
-  return { name, matrix, description };
+function gate(name: string, symbol: string, matrix: Matrix2, description: string, axis: Vec3, angle: number): Gate {
+  return { name, symbol, matrix, description, rotation: { axis: normalize3(axis), angle } };
 }
 
 function phase(angle: number): Complex {

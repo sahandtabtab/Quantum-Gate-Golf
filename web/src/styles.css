@@ -922,3 +922,199 @@ select {
     padding: 10px;
   }
 }
+
+/* Circuit-run flow refinements */
+.statusPill.running {
+  background: rgba(17, 213, 255, 0.18);
+  color: var(--cyan-dark);
+}
+
+.statusPill.failed {
+  background: rgba(255, 79, 114, 0.16);
+  color: #ff9bad;
+}
+
+.statusPanel .gateSetMeta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.compactButton {
+  min-height: 38px;
+  margin-top: 14px;
+  padding: 0 14px;
+}
+
+.menuButton,
+.runButton {
+  border: 1px solid rgba(101, 229, 255, 0.54);
+  border-radius: 8px;
+  background: rgba(17, 213, 255, 0.12);
+  color: var(--cyan-dark);
+  font-weight: 900;
+}
+
+.menuButton {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.runButton {
+  min-height: 34px;
+  padding: 0 14px;
+  box-shadow: 0 0 18px rgba(17, 213, 255, 0.12);
+}
+
+.inlineActions {
+  flex-wrap: wrap;
+}
+
+.circuitWire {
+  justify-content: center;
+}
+
+.circuitWire.filled {
+  justify-content: center;
+}
+
+.circuitGateUnit {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  grid-template-columns: 20px auto 20px;
+  grid-template-rows: auto 20px;
+  align-items: center;
+  justify-items: center;
+  gap: 3px;
+  cursor: grab;
+}
+
+.circuitGateUnit.dragging {
+  opacity: 0.55;
+}
+
+.circuitGateUnit:active {
+  cursor: grabbing;
+}
+
+.circuitGateUnit .circuitGate {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.circuitNudge,
+.circuitRemove {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(101, 229, 255, 0.26);
+  border-radius: 6px;
+  background: rgba(9, 25, 34, 0.9);
+  color: var(--cyan-dark);
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.circuitNudge:first-child {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.circuitRemove {
+  grid-column: 3;
+  grid-row: 1;
+  color: #ff9bad;
+}
+
+.circuitNudge:last-child {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.gateSetNote,
+.levelGateSet {
+  margin: -6px 0 12px;
+  color: var(--cyan-dark);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.levelGateSet {
+  margin: 8px 0 0;
+}
+
+.gateButton.lockedGate {
+  border-color: rgba(142, 205, 222, 0.1);
+  background: rgba(11, 31, 42, 0.42);
+}
+
+.gateButton.lockedGate span,
+.gateButton.lockedGate small {
+  color: rgba(157, 182, 191, 0.72);
+}
+
+@media (max-width: 640px) {
+  .gamePanelHeader .eyebrow {
+    display: block;
+    margin-bottom: 0;
+  }
+
+  .menuButton {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+
+  .controlPanel .mobileCircuit {
+    order: 1;
+    margin: 8px 0 0;
+  }
+
+  .gatesSection {
+    order: 2;
+    margin-top: 12px;
+  }
+
+  .circuitBoard {
+    gap: 8px;
+  }
+
+  .circuitWire {
+    gap: 8px;
+    min-height: 64px;
+  }
+
+  .circuitGateUnit {
+    grid-template-columns: 18px auto 18px;
+    grid-template-rows: auto 18px;
+    gap: 2px;
+  }
+
+  .circuitNudge,
+  .circuitRemove {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .appShell.playMode .sceneStage {
+    flex-basis: 46svh;
+    min-height: min(305px, 46svh);
+    height: 46svh;
+  }
+
+  .appShell.playMode .controlPanel {
+    height: 54svh;
+  }
+}

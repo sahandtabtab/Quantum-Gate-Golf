@@ -10,35 +10,31 @@ test("mobile Bloch scene renders nonblank WebGL pixels", async ({ page }) => {
   await openAndCheckScene(page, "mobile");
 });
 
-test("gate click changes the Bloch scene while animating", async ({ page }) => {
+test("gate edits wait for RUN before revealing a result", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
   await startFirstLevel(page);
 
-  const canvas = page.locator("canvas").first();
-  await expect(canvas).toBeVisible();
-  await page.waitForTimeout(600);
-
-  const before = await canvasChecksum(page);
   await page.getByRole("button", { name: /^H/ }).click();
-  await expect(page.getByText("Animating H")).toBeVisible();
+  await expect(page.getByText("Ready to run")).toBeVisible();
+  await expect(page.getByText("Running circuit")).not.toBeVisible({ timeout: 100 });
+  await expect(page.getByText("Solved").first()).not.toBeVisible({ timeout: 100 });
 
-  await page.waitForTimeout(250);
-  const early = await canvasChecksum(page);
-  await page.waitForTimeout(850);
-  const later = await canvasChecksum(page);
-
-  expect(Math.abs(early - before)).toBeGreaterThan(250);
-  expect(Math.abs(later - early)).toBeGreaterThan(250);
+  await page.getByRole("button", { name: "RUN" }).click();
+  await expect(page.getByText("Running circuit")).toBeVisible();
+  await expect(page.getByText("Solved").first()).not.toBeVisible({ timeout: 100 });
 });
 
-test("solving a level shows celebration feedback", async ({ page }) => {
+test("solving a level shows late celebration and next-level action", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
   await startFirstLevel(page);
 
   await page.getByRole("button", { name: /^H/ }).click();
+  await expect(page.getByText("Solved").first()).not.toBeVisible();
+  await page.getByRole("button", { name: "RUN" }).click();
 
-  await expect(page.getByText("Solved").first()).toBeVisible();
+  await expect(page.getByText("Solved").first()).toBeVisible({ timeout: 3000 });
   await expect(page.locator(".celebrationBurst")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Next level" })).toBeVisible();
 });
 
 async function openAndCheckScene(page: Page, name: string) {
@@ -47,9 +43,9 @@ async function openAndCheckScene(page: Page, name: string) {
   const canvas = page.locator("canvas").first();
   await expect(canvas).toBeVisible();
   if (name === "mobile") {
-    const xGate = page.getByRole("button", { name: /^X/ });
-    await expect(xGate).toBeVisible();
-    const gateBox = await xGate.boundingBox();
+    const hGate = page.getByRole("button", { name: /^H/ });
+    await expect(hGate).toBeVisible();
+    const gateBox = await hGate.boundingBox();
     expect(gateBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(844);
   }
   await page.waitForTimeout(600);
@@ -89,9 +85,10 @@ async function openAndCheckScene(page: Page, name: string) {
 
 async function startFirstLevel(page: Page) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Pick a gate challenge/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /QUANTUM GATE GOLF/ })).toBeVisible();
   await page.getByRole("button", { name: /Start Level 1/ }).click();
   await expect(page.getByRole("button", { name: /^H/ })).toBeVisible();
+  await expect(page.getByText("Solved").first()).not.toBeVisible();
 }
 
 async function canvasChecksum(page: Page): Promise<number> {
@@ -113,3 +110,5 @@ async function canvasChecksum(page: Page): Promise<number> {
     return checksum;
   });
 }
+
+
