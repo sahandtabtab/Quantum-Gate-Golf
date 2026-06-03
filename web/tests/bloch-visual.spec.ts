@@ -1,4 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import { PUZZLES, STANDARD_GATES } from "../src/quantum";
+
+const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 
 test("desktop Bloch scene renders nonblank WebGL pixels", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
@@ -36,6 +39,25 @@ test("solving a level shows late celebration and next-level action", async ({ pa
   await expect(page.getByText("Solved").first()).toBeVisible({ timeout: 3000 });
   await expect(page.locator(".celebrationBurst")).toBeVisible();
   await expect(page.getByRole("button", { name: "Next level" })).toBeVisible();
+});
+
+test("solving the final level opens the certificate screen", async ({ page }) => {
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await seedProgressThroughPenultimateLevel(page);
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Continue:/ }).click();
+
+  const finalPuzzle = PUZZLES[PUZZLES.length - 1];
+  for (const gateName of finalPuzzle.solution) {
+    await clickGate(page, gateName);
+  }
+
+  await page.getByRole("button", { name: "RUN" }).click();
+  await expect(page.getByRole("heading", { name: "Certified Quantum Engineer!" })).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(".completionConfettiPiece").first()).toBeVisible();
 });
 
 async function openAndCheckScene(page: Page, name: string) {
@@ -92,24 +114,32 @@ async function startFirstLevel(page: Page) {
   await expect(page.getByText("Solved").first()).not.toBeVisible();
 }
 
-async function canvasChecksum(page: Page): Promise<number> {
-  return page.locator("canvas").first().evaluate((element) => {
-    const canvasElement = element as HTMLCanvasElement;
-    const gl = canvasElement.getContext("webgl2") ?? canvasElement.getContext("webgl");
-    if (!gl) {
-      return 0;
-    }
+async function seedProgressThroughPenultimateLevel(page: Page) {
+  const progress = Object.fromEntries(
+    PUZZLES.slice(0, -1).map((item) => [
+      item.id,
+      {
+        solved: true,
+        bestScore: 1200,
+        bestGates: item.solution.length,
+        xpAwarded: 100,
+        xpSpent: 0,
+      },
+    ]),
+  );
 
-    const pixels = new Uint8Array(canvasElement.width * canvasElement.height * 4);
-    gl.readPixels(0, 0, canvasElement.width, canvasElement.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-    let checksum = 0;
-    const stride = 64;
-    for (let index = 0; index < pixels.length; index += 4 * stride) {
-      checksum += pixels[index] * 3 + pixels[index + 1] * 5 + pixels[index + 2] * 7 + pixels[index + 3] * 11;
-    }
-    return checksum;
-  });
+  await page.addInitScript(
+    ({ key, value }) => window.localStorage.setItem(key, JSON.stringify(value)),
+    { key: PROGRESS_STORAGE_KEY, value: progress },
+  );
 }
 
+async function clickGate(page: Page, gateName: string) {
+  const gate = STANDARD_GATES[gateName];
+  const label = new RegExp(`${escapeRegex(gate.description)}$`);
+  await page.getByRole("button", { name: label }).click({ force: true });
+}
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

@@ -1389,3 +1389,225 @@ select {
     font-size: 0.66rem;
   }
 }
+.completionScreen {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  overflow: hidden;
+  place-items: center;
+  padding: clamp(24px, 5vw, 68px);
+  background:
+    radial-gradient(circle at 50% 24%, rgba(17, 213, 255, 0.26), transparent 34%),
+    radial-gradient(circle at 22% 72%, rgba(255, 79, 114, 0.18), transparent 28%),
+    radial-gradient(circle at 78% 68%, rgba(121, 240, 191, 0.15), transparent 26%),
+    linear-gradient(135deg, #071319 0%, #092536 56%, #061016 100%);
+}
+
+.completionScreen::before {
+  position: absolute;
+  inset: 12%;
+  border: 1px solid rgba(101, 229, 255, 0.18);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(17, 213, 255, 0.09), transparent 64%);
+  box-shadow: 0 0 140px rgba(17, 213, 255, 0.18);
+  content: "";
+  filter: blur(2px);
+}
+
+.completionConfetti {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.completionConfettiPiece {
+  position: absolute;
+  top: -14vh;
+  left: var(--left);
+  width: 10px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--color);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color) 70%, transparent);
+  opacity: 0;
+  transform: translate3d(0, -12vh, 0) rotate(var(--rotation));
+  animation: certificate-confetti var(--duration) cubic-bezier(0.16, 0.8, 0.22, 1) var(--delay) infinite;
+}
+
+.completionConfettiPiece:nth-child(3n) {
+  width: 8px;
+  height: 28px;
+}
+
+.completionConfettiPiece:nth-child(5n) {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.completionContent {
+  position: relative;
+  z-index: 2;
+  width: min(1040px, 100%);
+  text-align: center;
+}
+
+.completionEyebrow {
+  margin: 0 0 14px;
+  color: var(--cyan-dark);
+  font-size: clamp(0.8rem, 2vw, 1rem);
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.completionContent h1 {
+  max-width: 980px;
+  margin: 0 auto;
+  color: var(--ink);
+  font-size: clamp(3.2rem, 12vw, 8.5rem);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.88;
+  text-shadow:
+    0 0 26px rgba(17, 213, 255, 0.42),
+    0 0 72px rgba(255, 79, 114, 0.22);
+  text-transform: uppercase;
+  animation:
+    certificate-vibrate 620ms steps(2, end) infinite,
+    certificate-glow 2300ms ease-in-out infinite;
+}
+
+.completionCopy {
+  max-width: 710px;
+  margin: 24px auto 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  line-height: 1.55;
+}
+
+.completionStats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 28px auto 0;
+}
+
+.completionStats span {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  border: 1px solid rgba(101, 229, 255, 0.24);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: rgba(9, 25, 34, 0.62);
+  color: var(--cyan-dark);
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.completionActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.completionActions .primaryButton,
+.completionActions .resetProgressButton {
+  margin-top: 0;
+}
+
+.completionActions .resetProgressButton {
+  align-self: center;
+}
+
+@keyframes certificate-confetti {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -14vh, 0) rotate(var(--rotation));
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  88% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), 116vh, 0) rotate(calc(var(--rotation) + 780deg));
+  }
+}
+
+@keyframes certificate-vibrate {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  20% {
+    transform: translate3d(-2px, 1px, 0) rotate(-0.35deg);
+  }
+
+  40% {
+    transform: translate3d(2px, -1px, 0) rotate(0.35deg);
+  }
+
+  60% {
+    transform: translate3d(-1px, -2px, 0) rotate(0.2deg);
+  }
+
+  80% {
+    transform: translate3d(1px, 2px, 0) rotate(-0.2deg);
+  }
+}
+
+@keyframes certificate-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(17, 213, 255, 0));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 28px rgba(17, 213, 255, 0.36));
+  }
+}
+
+@media (max-width: 640px) {
+  .completionScreen {
+    min-height: 100dvh;
+    padding: 18px;
+  }
+
+  .completionContent h1 {
+    font-size: clamp(3rem, 17vw, 5rem);
+  }
+
+  .completionCopy {
+    margin-top: 18px;
+  }
+
+  .completionStats {
+    gap: 8px;
+    margin-top: 22px;
+  }
+
+  .completionStats span {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 0.72rem;
+  }
+
+  .completionActions {
+    margin-top: 24px;
+  }
+}

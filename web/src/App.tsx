@@ -23,8 +23,16 @@ const CELEBRATION_BITS = Array.from({ length: 18 }, (_, index) => ({
   x: `${Math.cos((index / 18) * Math.PI * 2) * (70 + (index % 3) * 26)}px`,
   y: `${Math.sin((index / 18) * Math.PI * 2) * (50 + (index % 4) * 18)}px`,
 }));
+const CERTIFICATE_CONFETTI = Array.from({ length: 96 }, (_, index) => ({
+  color: ["#11d5ff", "#ff4f72", "#ffd391", "#79f0bf"][index % 4],
+  delay: `${(index % 24) * 90}ms`,
+  drift: `${((index % 11) - 5) * 18}px`,
+  duration: `${2600 + (index % 7) * 240}ms`,
+  left: `${(index * 37) % 100}%`,
+  rotation: `${index * 31}deg`,
+}));
 
-type GameView = "levels" | "play";
+type GameView = "levels" | "play" | "complete";
 
 type LevelRecord = {
   solved: boolean;
@@ -94,6 +102,7 @@ export default function App() {
   const unlockedThrough = firstUnsolvedIndex === -1 ? PUZZLES.length - 1 : firstUnsolvedIndex;
   const nextPuzzle = firstUnsolvedIndex === -1 ? PUZZLES[0] : PUZZLES[firstUnsolvedIndex];
   const nextLevel = PUZZLES[puzzleIndex + 1];
+  const finalPuzzleId = PUZZLES[PUZZLES.length - 1]?.id;
 
   useEffect(() => {
     saveProgress(progress);
@@ -151,6 +160,14 @@ export default function App() {
     playTone(523.25, 0.1, 0.025, 0);
     playTone(659.25, 0.12, 0.022, 0.08);
     playTone(783.99, 0.18, 0.02, 0.17);
+  };
+  const playFinale = () => {
+    playTone(523.25, 0.12, 0.026, 0);
+    playTone(659.25, 0.13, 0.026, 0.08);
+    playTone(783.99, 0.16, 0.024, 0.17);
+    playTone(1046.5, 0.18, 0.022, 0.32);
+    playTone(1318.51, 0.2, 0.02, 0.48);
+    playTone(1567.98, 0.28, 0.018, 0.66);
   };
   const playLoss = () => {
     playTone(246.94, 0.12, 0.018, 0, "triangle");
@@ -348,7 +365,11 @@ export default function App() {
       return;
     }
 
-    playWin();
+    if (activeRun.puzzle.id === finalPuzzleId) {
+      playFinale();
+    } else {
+      playWin();
+    }
     setCelebrationNonce((current) => current + 1);
     setProgress((current) => {
       const existing = current[activeRun.puzzle.id];
@@ -424,12 +445,18 @@ export default function App() {
   };
 
   const handleAnimationComplete = () => {
-    if (!activeRunRef.current) {
+    const activeRun = activeRunRef.current;
+    if (!activeRun) {
       return;
     }
 
     setAnimationLabel("Idle");
     setIsRunning(false);
+
+    if (activeRun.result.fidelity >= 0.999 && activeRun.puzzle.id === finalPuzzleId) {
+      activeRunRef.current = null;
+      setView("complete");
+    }
   };
 
   const readoutValue = (value: string) => (resultRevealed ? value : "--");
@@ -504,6 +531,19 @@ export default function App() {
     </section>
   );
 
+  if (view === "complete") {
+    return (
+      <CompletionScreen
+        availableXp={availableXp}
+        rank={rank}
+        replayFinal={() => finalPuzzleId ? startPuzzle(finalPuzzleId) : undefined}
+        resetProgress={resetProgress}
+        showLevels={() => { playClick(); setView("levels"); }}
+        totalXp={totalXp}
+      />
+    );
+  }
+
   if (view === "levels") {
     return (
       <LevelSelectScreen
@@ -517,6 +557,7 @@ export default function App() {
         nextPuzzle={nextPuzzle}
         startPuzzle={startPuzzle}
         resetProgress={resetProgress}
+        showCompletion={() => { playClick(); setView("complete"); }}
       />
     );
   }
@@ -676,6 +717,7 @@ function LevelSelectScreen({
   nextPuzzle,
   startPuzzle,
   resetProgress,
+  showCompletion,
 }: {
   progress: ProgressState;
   totalXp: number;
@@ -687,8 +729,10 @@ function LevelSelectScreen({
   nextPuzzle: Puzzle;
   startPuzzle: (puzzleId: string) => void;
   resetProgress: () => void;
+  showCompletion: () => void;
 }) {
   const completedCount = PUZZLES.filter((item) => progress[item.id]?.solved).length;
+  const allLevelsComplete = completedCount === PUZZLES.length;
   const xpPercent = Math.round((xpIntoRank / RANK_XP) * 100);
 
   return (
@@ -699,8 +743,8 @@ function LevelSelectScreen({
           <p>
             Clear each target with short quantum circuits. New levels unlock as you solve the previous one.
           </p>
-          <button type="button" className="primaryButton" onClick={() => startPuzzle(nextPuzzle.id)}>
-            Continue: {nextPuzzle.title}
+          <button type="button" className="primaryButton" onClick={() => allLevelsComplete ? showCompletion() : startPuzzle(nextPuzzle.id)}>
+            {allLevelsComplete ? "View certificate" : `Continue: ${nextPuzzle.title}`}
           </button>
         </div>
 
@@ -753,6 +797,69 @@ function LevelSelectScreen({
   );
 }
 
+function CompletionScreen({
+  availableXp,
+  rank,
+  replayFinal,
+  resetProgress,
+  showLevels,
+  totalXp,
+}: {
+  availableXp: number;
+  rank: number;
+  replayFinal: () => void | undefined;
+  resetProgress: () => void;
+  showLevels: () => void;
+  totalXp: number;
+}) {
+  return (
+    <main className="completionScreen" aria-label="Completion certificate">
+      <div className="completionConfetti" aria-hidden="true">
+        {CERTIFICATE_CONFETTI.map((bit, index) => (
+          <span
+            className="completionConfettiPiece"
+            key={index}
+            style={
+              {
+                "--color": bit.color,
+                "--delay": bit.delay,
+                "--drift": bit.drift,
+                "--duration": bit.duration,
+                "--left": bit.left,
+                "--rotation": bit.rotation,
+              } as CSSProperties
+            }
+          />
+        ))}
+      </div>
+
+      <section className="completionContent">
+        <p className="completionEyebrow">Qubit Golf complete</p>
+        <h1>Certified Quantum Engineer!</h1>
+        <p className="completionCopy">
+          Every Bloch target cleared. Every gate challenge conquered. This certificate is extremely unofficial and fully deserved.
+        </p>
+        <div className="completionStats" aria-label="Completion stats">
+          <span>{PUZZLES.length} levels cleared</span>
+          <span>Rank {rank}</span>
+          <span>{availableXp} XP available</span>
+          <span>{totalXp} XP earned</span>
+        </div>
+        <div className="completionActions">
+          <button type="button" className="primaryButton" onClick={showLevels}>
+            Level menu
+          </button>
+          <button type="button" className="menuButton" onClick={replayFinal}>
+            Replay finale
+          </button>
+          <button type="button" className="textButton resetProgressButton" onClick={resetProgress}>
+            Reset progress
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
 function pickHintGate(puzzle: Puzzle, sequence: string[]): string {
   const solution = puzzle.solution;
   if (solution.length === 0) {
