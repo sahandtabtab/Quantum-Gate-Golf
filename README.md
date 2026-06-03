@@ -50,7 +50,3 @@ Run the Playwright visual checks:
 ```bash
 npm run test:visual
 ```
-
-## Deployment
-
-The project is deployed with GitHub Pages. Pushing to `main` triggers the GitHub Actions workflow, builds the Vite app, and publishes the production site.
