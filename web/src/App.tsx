@@ -593,7 +593,7 @@ export default function App() {
 
       <aside className="controlPanel">
         <div className="panelHeader gamePanelHeader">
-          <p className="eyebrow">Quantum Gate Golf</p>
+          <p className="eyebrow">Qubit Golf</p>
           <button type="button" className="menuButton" onClick={() => { playClick(); setView("levels"); }}>
             Main menu
           </button>
@@ -695,7 +695,7 @@ function LevelSelectScreen({
     <main className="levelSelectScreen">
       <section className="levelHero">
         <div className="levelHeroCopy">
-          <h1>QUANTUM GATE GOLF</h1>
+          <h1>QUBIT GOLF</h1>
           <p>
             Clear each target with short quantum circuits. New levels unlock as you solve the previous one.
           </p>

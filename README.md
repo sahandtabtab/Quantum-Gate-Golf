@@ -1,6 +1,6 @@
-# Quantum Gate Golf
+# Qubit Golf
 
-Quantum Gate Golf is a browser game for learning single-qubit gates. Build a short quantum circuit, run it, and watch the state move on a Bloch sphere toward the target.
+Qubit Golf is a browser game for learning single-qubit gates. Build a short quantum circuit, run it, and watch the state move on a Bloch sphere toward the target.
 
 Play it here:
 

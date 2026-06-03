@@ -86,7 +86,7 @@ async function openAndCheckScene(page: Page, name: string) {
 
 async function startFirstLevel(page: Page) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /QUANTUM GATE GOLF/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
   await page.getByRole("button", { name: /Start Level 1/ }).click();
   await expect(page.getByRole("button", { name: /^H/ })).toBeVisible();
   await expect(page.getByText("Solved").first()).not.toBeVisible();
