@@ -603,7 +603,7 @@ export default function App() {
             {statusText}
           </span>
           <h1>{puzzle.title}</h1>
-          <p>Build a full circuit, then run it against the red target.</p>
+          <p>Choose gates that move the starting state to the target on the Bloch sphere.</p>
           <p className="objectiveMeta">Gate limit: {puzzle.gateLimit} {puzzle.gateLimit === 1 ? "gate" : "gates"}.</p>
           {puzzle.gateSetLabel ? <p className="gateSetMeta">Gate set: {puzzle.gateSetLabel}</p> : null}
           {solved && nextLevel ? (
