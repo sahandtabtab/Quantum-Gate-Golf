@@ -6,7 +6,7 @@ import { gateRotation, rotateBlochVector, slerpUnit, smoothstep, type Vec3 } fro
 type BlochSceneProps = {
   keyVectors: Vec3[];
   gateSequence: string[];
-  targetVector: Vec3;
+  targetVector: Vec3 | null;
   animationMode: "to-final" | "replay";
   showTrajectory: boolean;
   solved: boolean;
@@ -52,7 +52,7 @@ export default function BlochScene({
   const animationPathRef = useRef<Vec3[]>(keyVectors.length > 0 ? keyVectors : [NORTH_POLE]);
   const trailKeyVectorsRef = useRef<Vec3[]>(keyVectors.length > 0 ? keyVectors : [NORTH_POLE]);
   const displayedVectorRef = useRef<Vec3>(keyVectors[keyVectors.length - 1] ?? NORTH_POLE);
-  const targetVectorRef = useRef(targetVector);
+  const targetVectorRef = useRef<Vec3 | null>(targetVector);
   const solvedRef = useRef(solved);
   const celebrationStartRef = useRef(0);
   const animationModeRef = useRef(animationMode);
@@ -219,6 +219,12 @@ export default function BlochScene({
     if (!objects) {
       return;
     }
+    if (!targetVectorRef.current) {
+      objects.targetVector.group.visible = false;
+      return;
+    }
+
+    objects.targetVector.group.visible = true;
     updateBlochVector(objects.targetVector, targetVectorRef.current);
   }
 

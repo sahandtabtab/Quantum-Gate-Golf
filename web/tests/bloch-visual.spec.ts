@@ -15,14 +15,13 @@ test("mobile Bloch scene renders nonblank WebGL pixels", async ({ page }) => {
 
 test("mobile circuit wraps long sequences without horizontal scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await seedProgressThroughPenultimateLevel(page);
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
-  await page.getByRole("button", { name: /Continue:/ }).click();
+  await page.getByRole("button", { name: "Sandbox mode" }).click();
+  await expect(page.getByRole("heading", { name: "Sandbox" })).toBeVisible();
 
-  const finalPuzzle = PUZZLES[PUZZLES.length - 1];
-  for (const gateName of finalPuzzle.solution) {
+  for (const gateName of ["H", "T", "H", "S", "TDG", "H", "SDG", "X"]) {
     await clickGate(page, gateName);
   }
 

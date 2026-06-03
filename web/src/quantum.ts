@@ -20,6 +20,14 @@ export type Gate = {
   rotation: GateRotation;
 };
 
+export type PuzzleCase = {
+  label: string;
+  startLabel: string;
+  targetLabel: string;
+  startState: QubitState;
+  targetState: QubitState;
+};
+
 export type Puzzle = {
   id: string;
   title: string;
@@ -28,6 +36,17 @@ export type Puzzle = {
   solution: string[];
   allowedGates?: string[];
   gateSetLabel?: string;
+  kind?: "target" | "gate-design" | "sandbox";
+  mission?: string;
+  cases?: PuzzleCase[];
+};
+
+export type PuzzleCaseResult = PuzzleCase & {
+  finalState: QubitState;
+  finalBloch: Vec3;
+  targetBloch: Vec3;
+  fidelity: number;
+  angularErrorDegrees: number;
 };
 
 export type PuzzleResult = {
@@ -37,6 +56,7 @@ export type PuzzleResult = {
   fidelity: number;
   angularErrorDegrees: number;
   score: number;
+  cases: PuzzleCaseResult[];
 };
 
 const EPSILON = 1e-12;
@@ -64,6 +84,24 @@ export const STANDARD_GATES: Record<string, Gate> = {
   SDG: gate("SDG", "S\u207b\u00b9", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
   T: gate("T", "T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase", [0, 0, 1], Math.PI / 4),
   TDG: gate("TDG", "T\u207b\u00b9", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
+};
+
+const STATE_ZERO = INITIAL_STATE;
+const STATE_PLUS_X = stateFromBloch(Math.PI / 2, 0);
+const STATE_MINUS_X = stateFromBloch(Math.PI / 2, Math.PI);
+const STATE_PLUS_Y = stateFromBloch(Math.PI / 2, Math.PI / 2);
+const STATE_MINUS_Y = stateFromBloch(Math.PI / 2, -Math.PI / 2);
+
+export const SANDBOX_PUZZLE: Puzzle = {
+  id: "sandbox",
+  title: "Sandbox",
+  targetState: INITIAL_STATE,
+  gateLimit: 32,
+  solution: [],
+  allowedGates: ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"],
+  gateSetLabel: "All standard gates",
+  kind: "sandbox",
+  mission: "Experiment freely with gate sequences and watch the Bloch vector move.",
 };
 
 export const PUZZLES: Puzzle[] = [
@@ -229,10 +267,90 @@ export const PUZZLES: Puzzle[] = [
     allowedGates: ["H", "S", "SDG", "T", "TDG", "X", "Y", "Z"],
     gateSetLabel: "Full single-qubit toolbox",
   },
+  {
+    id: "design_x_no_x",
+    title: "Design X gate",
+    targetState: targetFromStateSequence(STATE_ZERO, ["X"]),
+    gateLimit: 3,
+    solution: ["H", "Z", "H"],
+    allowedGates: ["H", "Z", "S", "SDG", "T", "TDG"],
+    gateSetLabel: "Robust design: no X gate",
+    kind: "gate-design",
+    mission: "Build one circuit that behaves like an X gate on every probe state.",
+    cases: operationCases(["X"], [
+      ["North pole", "|0⟩", STATE_ZERO],
+      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
+      ["-X probe", "|-x⟩", STATE_MINUS_X],
+    ]),
+  },
+  {
+    id: "design_z_no_z",
+    title: "Design Z gate",
+    targetState: targetFromStateSequence(STATE_PLUS_X, ["Z"]),
+    gateLimit: 3,
+    solution: ["H", "X", "H"],
+    allowedGates: ["H", "X", "S", "SDG", "T", "TDG"],
+    gateSetLabel: "Robust design: no Z gate",
+    kind: "gate-design",
+    mission: "Build one circuit that behaves like a Z gate on every probe state.",
+    cases: operationCases(["Z"], [
+      ["+X probe", "|+x⟩", STATE_PLUS_X],
+      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
+      ["North pole", "|0⟩", STATE_ZERO],
+    ]),
+  },
+  {
+    id: "design_sdg_from_tdg",
+    title: "Design S⁻¹",
+    targetState: targetFromStateSequence(STATE_PLUS_X, ["SDG"]),
+    gateLimit: 2,
+    solution: ["TDG", "TDG"],
+    allowedGates: ["H", "T", "TDG", "Z"],
+    gateSetLabel: "Robust inverse phase",
+    kind: "gate-design",
+    mission: "Synthesize S⁻¹ from smaller phase rotations and pass every probe.",
+    cases: operationCases(["SDG"], [
+      ["+X probe", "|+x⟩", STATE_PLUS_X],
+      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
+      ["-Y probe", "|-y⟩", STATE_MINUS_Y],
+    ]),
+  },
+  {
+    id: "design_tdg_without_tdg",
+    title: "Design T⁻¹",
+    targetState: targetFromStateSequence(STATE_PLUS_X, ["TDG"]),
+    gateLimit: 2,
+    solution: ["SDG", "T"],
+    allowedGates: ["H", "S", "SDG", "T", "Z"],
+    gateSetLabel: "Robust design: no T⁻¹ gate",
+    kind: "gate-design",
+    mission: "Build a T⁻¹ operation without using the T⁻¹ button.",
+    cases: operationCases(["TDG"], [
+      ["+X probe", "|+x⟩", STATE_PLUS_X],
+      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
+      ["-X probe", "|-x⟩", STATE_MINUS_X],
+    ]),
+  },
+  {
+    id: "design_y_no_y",
+    title: "Design Y gate",
+    targetState: targetFromStateSequence(STATE_ZERO, ["Y"]),
+    gateLimit: 3,
+    solution: ["S", "X", "SDG"],
+    allowedGates: ["H", "X", "S", "SDG", "T", "TDG"],
+    gateSetLabel: "Robust design: no Y gate",
+    kind: "gate-design",
+    mission: "Assemble a Y gate from phase shifts and a bit flip, then pass every probe.",
+    cases: operationCases(["Y"], [
+      ["North pole", "|0⟩", STATE_ZERO],
+      ["+X probe", "|+x⟩", STATE_PLUS_X],
+      ["-Y probe", "|-y⟩", STATE_MINUS_Y],
+    ]),
+  },
 ];
 
-export function sequenceStates(sequence: string[]): QubitState[] {
-  let state = normalize(INITIAL_STATE);
+export function sequenceStates(sequence: string[], initialState: QubitState = INITIAL_STATE): QubitState[] {
+  let state = normalize(initialState);
   const states = [state];
 
   for (const gateName of sequence) {
@@ -245,6 +363,22 @@ export function sequenceStates(sequence: string[]): QubitState[] {
   }
 
   return states;
+}
+
+export function puzzleCases(puzzle: Puzzle): PuzzleCase[] {
+  if (puzzle.cases?.length) {
+    return puzzle.cases;
+  }
+
+  return [
+    {
+      label: "Target",
+      startLabel: "|0⟩",
+      targetLabel: puzzle.title,
+      startState: INITIAL_STATE,
+      targetState: puzzle.targetState,
+    },
+  ];
 }
 
 export function applyGate(state: QubitState, selectedGate: Gate): QubitState {
@@ -275,6 +409,25 @@ function targetFromSequence(sequence: string[]): QubitState {
   return states[states.length - 1] ?? INITIAL_STATE;
 }
 
+function targetFromStateSequence(initialState: QubitState, sequence: string[]): QubitState {
+  const states = sequenceStates(sequence, initialState);
+  return states[states.length - 1] ?? initialState;
+}
+
+function operationCases(
+  operation: string[],
+  probes: Array<[label: string, startLabel: string, startState: QubitState]>,
+): PuzzleCase[] {
+  const operationLabel = operation.map((gateName) => STANDARD_GATES[gateName]?.symbol ?? gateName).join(" ");
+  return probes.map(([label, startLabel, startState]) => ({
+    label,
+    startLabel,
+    targetLabel: `${operationLabel} ${startLabel}`,
+    startState,
+    targetState: targetFromStateSequence(startState, operation),
+  }));
+}
+
 export function fidelity(state: QubitState, target: QubitState): number {
   const [a, b] = normalize(state);
   const [ta, tb] = normalize(target);
@@ -290,9 +443,9 @@ export function angularErrorDegrees(state: QubitState, target: QubitState): numb
 }
 
 export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult {
-  const states = sequenceStates(sequence);
-  const finalState = states[states.length - 1];
-  const accuracy = fidelity(finalState, puzzle.targetState);
+  const caseResults = puzzleCases(puzzle).map((puzzleCase) => evaluatePuzzleCase(puzzleCase, sequence));
+  const primaryCase = caseResults[0];
+  const accuracy = Math.min(...caseResults.map((item) => item.fidelity));
   const gateCount = sequence.length;
 
   const accuracyPoints = Math.round(1000 * accuracy);
@@ -301,12 +454,26 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult
   const overLimitPenalty = Math.max(0, gateCount - puzzle.gateLimit) * 250;
 
   return {
+    finalState: primaryCase.finalState,
+    finalBloch: primaryCase.finalBloch,
+    targetBloch: primaryCase.targetBloch,
+    fidelity: accuracy,
+    angularErrorDegrees: Math.max(...caseResults.map((item) => item.angularErrorDegrees)),
+    score: Math.max(0, accuracyPoints + solvedBonus + remainingGateBonus - overLimitPenalty),
+    cases: caseResults,
+  };
+}
+
+function evaluatePuzzleCase(puzzleCase: PuzzleCase, sequence: string[]): PuzzleCaseResult {
+  const states = sequenceStates(sequence, puzzleCase.startState);
+  const finalState = states[states.length - 1];
+  return {
+    ...puzzleCase,
     finalState,
     finalBloch: blochVector(finalState),
-    targetBloch: blochVector(puzzle.targetState),
-    fidelity: accuracy,
-    angularErrorDegrees: angularErrorDegrees(finalState, puzzle.targetState),
-    score: Math.max(0, accuracyPoints + solvedBonus + remainingGateBonus - overLimitPenalty),
+    targetBloch: blochVector(puzzleCase.targetState),
+    fidelity: fidelity(finalState, puzzleCase.targetState),
+    angularErrorDegrees: angularErrorDegrees(finalState, puzzleCase.targetState),
   };
 }
 

@@ -3,11 +3,13 @@ import type { CSSProperties, DragEvent } from "react";
 import BlochScene from "./BlochScene";
 import {
   PUZZLES,
+  SANDBOX_PUZZLE,
   STANDARD_GATES,
   blochVector,
   evaluatePuzzle,
   formatAngles,
   formatState,
+  puzzleCases,
   sequenceStates,
 } from "./quantum";
 import type { Puzzle, PuzzleResult } from "./quantum";
@@ -32,7 +34,7 @@ const CERTIFICATE_CONFETTI = Array.from({ length: 96 }, (_, index) => ({
   rotation: `${index * 31}deg`,
 }));
 
-type GameView = "levels" | "play" | "complete";
+type GameView = "levels" | "play" | "sandbox" | "complete";
 
 type LevelRecord = {
   solved: boolean;
@@ -70,23 +72,35 @@ export default function App() {
   const runTokenRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  const puzzle = PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
+  const isSandbox = view === "sandbox";
+  const puzzle = isSandbox ? SANDBOX_PUZZLE : PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
+  const puzzleKind = puzzle.kind ?? "target";
+  const activePuzzleCases = useMemo(() => puzzleCases(puzzle), [puzzle]);
+  const primaryCase = activePuzzleCases[0];
   const puzzleIndex = Math.max(0, PUZZLES.findIndex((item) => item.id === puzzle.id));
   const allowedGateSet = useMemo(() => new Set(puzzle.allowedGates ?? GATE_ORDER), [puzzle]);
   const gateLimitReached = sequence.length >= puzzle.gateLimit;
-  const gateUsageText = `${sequence.length}/${puzzle.gateLimit} gates used`;
+  const gateUsageText = isSandbox
+    ? `${sequence.length}/${puzzle.gateLimit} sandbox gates`
+    : `${sequence.length}/${puzzle.gateLimit} gates used`;
   const visibleGateOrder = GATE_ORDER.filter((gateName) => allowedGateSet.has(gateName));
-  const states = useMemo(() => sequenceStates(displaySequence), [displaySequence]);
+  const states = useMemo(() => sequenceStates(displaySequence, primaryCase.startState), [displaySequence, primaryCase]);
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
-  const solved = resultRevealed && result.fidelity >= 0.999;
-  const statusText = solved
-    ? "Solved"
-    : isRunning && !resultRevealed
+  const solved = !isSandbox && resultRevealed && result.fidelity >= 0.999;
+  const circuitStartLabel = puzzleKind === "gate-design" ? "probes" : primaryCase.startLabel;
+  const circuitEndLabel = puzzleKind === "gate-design" ? "targets" : "|ψ⟩";
+  const statusText = isSandbox
+    ? isRunning && !resultRevealed
       ? "Running"
-      : resultRevealed
-        ? "Try again"
-        : "Build circuit";
+      : "Sandbox"
+    : solved
+      ? "Solved"
+      : isRunning && !resultRevealed
+        ? "Running"
+        : resultRevealed
+          ? "Try again"
+          : "Build circuit";
   const totalXp = useMemo(
     () => PUZZLES.reduce((sum, item) => sum + (progress[item.id]?.xpAwarded ?? 0), 0),
     [progress],
@@ -201,6 +215,13 @@ export default function App() {
     clearRun("Build circuit");
   };
 
+  const startSandbox = () => {
+    playClick();
+    setPuzzleId(SANDBOX_PUZZLE.id);
+    setView("sandbox");
+    clearRun("Sandbox");
+  };
+
   const resetProgress = () => {
     playClick();
     const confirmed = window.confirm("Reset all level progress and XP?");
@@ -231,7 +252,7 @@ export default function App() {
   };
 
   const buyGateHint = () => {
-    if (isRunning || puzzle.solution.length === 0) {
+    if (isSandbox || isRunning || puzzle.solution.length === 0) {
       return;
     }
 
@@ -360,6 +381,10 @@ export default function App() {
 
     revealedRunKeyRef.current = runKey;
     setResultRevealed(true);
+    if (activeRun.puzzle.kind === "sandbox") {
+      return;
+    }
+
     if (activeRun.result.fidelity < 0.999) {
       playLoss();
       return;
@@ -558,6 +583,7 @@ export default function App() {
         startPuzzle={startPuzzle}
         resetProgress={resetProgress}
         showCompletion={() => { playClick(); setView("complete"); }}
+        startSandbox={startSandbox}
       />
     );
   }
@@ -568,7 +594,7 @@ export default function App() {
         <BlochScene
           keyVectors={keyVectors}
           gateSequence={displaySequence}
-          targetVector={result.targetBloch}
+          targetVector={isSandbox ? null : result.targetBloch}
           animationMode={animationMode}
           showTrajectory={showTrajectory}
           solved={solved}
@@ -599,12 +625,18 @@ export default function App() {
         ) : null}
 
         <section className="floatingPanel statusPanel" aria-label="Puzzle status">
-          <span className={`statusPill ${solved ? "solved" : resultRevealed ? "failed" : isRunning ? "running" : ""}`}>
+          <span className={`statusPill ${solved ? "solved" : !isSandbox && resultRevealed ? "failed" : isRunning ? "running" : isSandbox ? "sandbox" : ""}`}>
             {statusText}
           </span>
           <h1>{puzzle.title}</h1>
-          <p>Choose gates that move the starting state to the target on the Bloch sphere.</p>
-          <p className="objectiveMeta">Gate limit: {puzzle.gateLimit} {puzzle.gateLimit === 1 ? "gate" : "gates"}.</p>
+          <p>{puzzle.mission ?? "Choose gates that move the starting state to the target on the Bloch sphere."}</p>
+          <p className="objectiveMeta">
+            {isSandbox
+              ? `Free build cap: ${puzzle.gateLimit} gates.`
+              : puzzleKind === "gate-design"
+                ? `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}. Probe tests: ${activePuzzleCases.length}.`
+                : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
+          </p>
           {puzzle.gateSetLabel ? <p className="gateSetMeta">Gate set: {puzzle.gateSetLabel}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
@@ -618,16 +650,16 @@ export default function App() {
 
         <section className="floatingPanel readoutPanel" aria-label="Current result">
           <div>
-            <span>Fidelity</span>
-            <strong>{readoutValue(`${(result.fidelity * 100).toFixed(2)}%`)}</strong>
+            <span>{isSandbox ? "Gates" : "Fidelity"}</span>
+            <strong>{isSandbox ? readoutValue(String(displaySequence.length)) : readoutValue(`${(result.fidelity * 100).toFixed(2)}%`)}</strong>
           </div>
           <div>
-            <span>Error</span>
-            <strong>{readoutValue(`${result.angularErrorDegrees.toFixed(1)} deg`)}</strong>
+            <span>{isSandbox ? "Mode" : "Error"}</span>
+            <strong>{isSandbox ? "Free" : readoutValue(`${result.angularErrorDegrees.toFixed(1)} deg`)}</strong>
           </div>
           <div>
             <span>Score</span>
-            <strong>{readoutValue(String(result.score))}</strong>
+            <strong>{isSandbox ? "--" : readoutValue(String(result.score))}</strong>
           </div>
         </section>
       </main>
@@ -638,9 +670,9 @@ export default function App() {
           <button type="button" className="menuButton" onClick={() => { playClick(); setView("levels"); }}>
             Main menu
           </button>
-          <h2>Gate controls</h2>
+          <h2>{isSandbox ? "Sandbox controls" : "Gate controls"}</h2>
           <div className="panelLevelMeta">
-            <span>Level {puzzleIndex + 1} of {PUZZLES.length}</span>
+            <span>{isSandbox ? "Free play" : `Level ${puzzleIndex + 1} of ${PUZZLES.length}`}</span>
           </div>
         </div>
 
@@ -653,7 +685,7 @@ export default function App() {
               Replay
             </button>
           </div>
-          <p className="gateSetNote">{puzzle.gateSetLabel ?? "All gates available"} - {gateUsageText}</p>
+          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : puzzle.gateSetLabel ?? "All gates available"} - {gateUsageText}</p>
           <div className="gateGrid">
             {visibleGateOrder.map((gateName) => (
               <button
@@ -672,10 +704,12 @@ export default function App() {
         <section className="panelSection details">
           <h3>Readout</h3>
           <dl>
-            <div>
-              <dt>Target</dt>
-              <dd className="mathReadout">{formatAngles(result.targetBloch)}</dd>
-            </div>
+            {!isSandbox ? (
+              <div>
+                <dt>{puzzleKind === "gate-design" ? "Primary target" : "Target"}</dt>
+                <dd className="mathReadout">{formatAngles(result.targetBloch)}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Current</dt>
               <dd className="mathReadout">{resultRevealed ? formatAngles(result.finalBloch) : "Run circuit to reveal."}</dd>
@@ -684,9 +718,27 @@ export default function App() {
               <dt>State</dt>
               <dd>{resultRevealed ? formatState(result.finalState) : "Run circuit to reveal."}</dd>
             </div>
+            {puzzleKind === "gate-design" ? (
+              <div>
+                <dt>Probe tests</dt>
+                <dd className="probeCaseList">
+                  {result.cases.map((caseResult) => (
+                    <span
+                      className={`probeCase ${resultRevealed ? (caseResult.fidelity >= 0.999 ? "pass" : "fail") : ""}`}
+                      key={caseResult.label}
+                    >
+                      <strong>{caseResult.label}</strong>
+                      <em>{caseResult.startLabel} → {caseResult.targetLabel}</em>
+                      <b>{resultRevealed ? `${(caseResult.fidelity * 100).toFixed(1)}%` : "--"}</b>
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </section>
 
+        {!isSandbox ? (
         <section className="panelSection hintBox">
           <p className="hintWallet">Rank {rank} / {availableXp} XP</p>
           <div className="sectionHeader">
@@ -701,6 +753,7 @@ export default function App() {
             </button>
           </div>
         </section>
+        ) : null}
       </aside>
     </div>
   );
@@ -718,6 +771,7 @@ function LevelSelectScreen({
   startPuzzle,
   resetProgress,
   showCompletion,
+  startSandbox,
 }: {
   progress: ProgressState;
   totalXp: number;
@@ -730,6 +784,7 @@ function LevelSelectScreen({
   startPuzzle: (puzzleId: string) => void;
   resetProgress: () => void;
   showCompletion: () => void;
+  startSandbox: () => void;
 }) {
   const completedCount = PUZZLES.filter((item) => progress[item.id]?.solved).length;
   const allLevelsComplete = completedCount === PUZZLES.length;
@@ -743,9 +798,14 @@ function LevelSelectScreen({
           <p>
             Clear each target with short quantum circuits. New levels unlock as you solve the previous one.
           </p>
-          <button type="button" className="primaryButton" onClick={() => allLevelsComplete ? showCompletion() : startPuzzle(nextPuzzle.id)}>
-            {allLevelsComplete ? "View certificate" : `Continue: ${nextPuzzle.title}`}
-          </button>
+          <div className="levelHeroActions">
+            <button type="button" className="primaryButton" onClick={() => allLevelsComplete ? showCompletion() : startPuzzle(nextPuzzle.id)}>
+              {allLevelsComplete ? "View certificate" : `Continue: ${nextPuzzle.title}`}
+            </button>
+            <button type="button" className="menuButton sandboxButton" onClick={startSandbox}>
+              Sandbox mode
+            </button>
+          </div>
         </div>
 
         <div className="xpCard" aria-label="Player progress">
@@ -785,6 +845,7 @@ function LevelSelectScreen({
               <h2>{item.title}</h2>
               <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
               {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
+              {item.kind === "gate-design" ? <p className="levelModeTag">Robust gate design</p> : null}
               <div className="levelCardStats">
                 <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
                 <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>

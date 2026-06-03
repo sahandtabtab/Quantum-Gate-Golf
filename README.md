@@ -1,6 +1,6 @@
 # Qubit Golf
 
-Qubit Golf is a browser game for learning single-qubit gates. Build a short quantum circuit, run it, and watch the state move on a Bloch sphere toward the target.
+Qubit Golf is a browser game for learning single-qubit gates. Build short quantum circuits, run them, and watch the state move on a Bloch sphere toward the target.
 
 Play it here:
 
@@ -8,7 +8,7 @@ https://sahandtabtab.github.io/Quantum-Gate-Golf/
 
 ## Game Loop
 
-Each level gives you a target state and a maximum number of gates.
+Most levels give you a target state and a maximum number of gates. Later robust gate-design levels ask you to build one circuit that passes several probe states, so the circuit behaves like a real gate rather than just solving one starting state.
 
 1. Pick a level from the level menu.
 2. Build a circuit from the available gates.
@@ -19,6 +19,8 @@ Each level gives you a target state and a maximum number of gates.
 7. Earn XP, unlock the next level, and spend XP on rare gate hints.
 
 Hints add one gate from a good solution directly into your circuit. Progress and XP are stored locally in the browser, and can be reset from the level menu.
+
+Sandbox mode is available from the main menu. It has no XP, scoring, or target state; it is just a free space for trying gate sequences and studying the Bloch-sphere motion.
 
 ## Development
 

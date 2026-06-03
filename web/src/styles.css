@@ -117,6 +117,17 @@ button:disabled {
   font-weight: 900;
 }
 
+.levelHeroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.levelHeroActions .primaryButton {
+  margin-top: 0;
+}
+
 .xpCard {
   display: flex;
   flex-direction: column;
@@ -358,6 +369,11 @@ button:disabled {
 .statusPill.solved {
   background: rgba(28, 171, 118, 0.22);
   color: #79f0bf;
+}
+
+.statusPill.sandbox {
+  background: rgba(17, 213, 255, 0.16);
+  color: var(--cyan-dark);
 }
 
 .statusPanel h1 {
@@ -694,6 +710,53 @@ select {
   font-size: 0.98rem;
 }
 
+.details .probeCaseList {
+  display: grid;
+  gap: 7px;
+  font-family: inherit;
+}
+
+.probeCase {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border: 1px solid rgba(142, 205, 222, 0.18);
+  border-radius: 8px;
+  background: rgba(11, 31, 42, 0.55);
+}
+
+.probeCase strong,
+.probeCase b {
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.probeCase em {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-size: 0.92rem;
+  font-style: normal;
+}
+
+.probeCase.pass {
+  border-color: rgba(121, 240, 191, 0.36);
+}
+
+.probeCase.pass b {
+  color: #79f0bf;
+}
+
+.probeCase.fail {
+  border-color: rgba(255, 79, 114, 0.34);
+}
+
+.probeCase.fail b {
+  color: #ff9bad;
+}
+
 .hintBox {
   margin-bottom: 20px;
 }
@@ -797,6 +860,14 @@ select {
   .primaryButton {
     width: 100%;
     justify-content: center;
+  }
+
+  .levelHeroActions {
+    flex-direction: column;
+  }
+
+  .levelHeroActions .sandboxButton {
+    width: 100%;
   }
 
   .levelCardGrid {
@@ -931,6 +1002,9 @@ select {
 
 .menuButton,
 .runButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(101, 229, 255, 0.54);
   border-radius: 8px;
   background: rgba(17, 213, 255, 0.12);
@@ -944,6 +1018,11 @@ select {
   padding: 0 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.levelHeroActions .sandboxButton {
+  min-height: 46px;
+  padding: 0 18px;
 }
 
 .runButton {
@@ -1029,6 +1108,15 @@ select {
 
 .levelGateSet {
   margin: 8px 0 0;
+}
+
+.levelModeTag {
+  margin: 7px 0 0;
+  color: #ffd391;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .gateButton.lockedGate {
