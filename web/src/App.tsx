@@ -826,68 +826,92 @@ function LevelSelectScreen({
   showCompletion: () => void;
   startSandbox: () => void;
 }) {
+  const [selectedMode, setSelectedMode] = useState<PuzzleMode | null>(null);
   const completedCount = PUZZLES.filter((item) => progress[item.id]?.solved).length;
   const allLevelsComplete = completedCount === PUZZLES.length;
   const xpPercent = Math.round((xpIntoRank / RANK_XP) * 100);
   const statePuzzles = puzzlesForMode("state-transfer");
   const designPuzzles = puzzlesForMode("unitary-design");
-  const stateNext = nextPuzzleForMode("state-transfer", progress);
-  const designNext = nextPuzzleForMode("unitary-design", progress);
   const stateComplete = completedCountForMode("state-transfer", progress);
   const designComplete = completedCountForMode("unitary-design", progress);
 
-  const renderLevelSection = (mode: PuzzleMode, title: string, copy: string) => {
+  const renderLevelCards = (mode: PuzzleMode, title: string) => {
     const modePuzzles = puzzlesForMode(mode);
     const unlockedThrough = unlockedIndexForMode(mode, progress);
 
     return (
-      <section className="modeLevelSection" aria-label={`${title} levels`}>
-        <div className="modeSectionHeader">
-          <div>
-            <p className="eyebrow">{mode === "state-transfer" ? "State mode" : "Design mode"}</p>
-            <h2>{title}</h2>
-            <p>{copy}</p>
-          </div>
-          <strong>{completedCountForMode(mode, progress)} / {modePuzzles.length} cleared</strong>
-        </div>
-        <div className="levelCardGrid">
-          {modePuzzles.map((item, index) => {
-            const record = progress[item.id];
-            const locked = index > unlockedThrough;
-            const action = record?.solved ? "Replay" : "Start";
+      <div className="levelCardGrid">
+        {modePuzzles.map((item, index) => {
+          const record = progress[item.id];
+          const locked = index > unlockedThrough;
+          const action = record?.solved ? "Replay" : "Start";
 
-            return (
-              <button
-                type="button"
-                className={`levelCard ${record?.solved ? "cleared" : ""} ${locked ? "locked" : ""}`}
-                key={item.id}
-                disabled={locked}
-                onClick={() => startPuzzle(item.id)}
-                aria-label={locked ? `${title} level ${index + 1} locked` : `${action} ${title} Level ${index + 1}: ${item.title}`}
-              >
-                <div className="levelCardTopline">
-                  <span>Level {index + 1}</span>
-                  <strong>{locked ? "Locked" : record?.solved ? "Cleared" : "Open"}</strong>
-                </div>
-                <h2>{item.title}</h2>
-                <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
-                {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
-                {item.kind === "gate-design" ? <p className="levelModeTag">Gate design</p> : null}
-                <div className="levelCardStats">
-                  <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
-                  <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+          return (
+            <button
+              type="button"
+              className={`levelCard ${record?.solved ? "cleared" : ""} ${locked ? "locked" : ""}`}
+              key={item.id}
+              disabled={locked}
+              onClick={() => startPuzzle(item.id)}
+              aria-label={locked ? `${title} level ${index + 1} locked` : `${action} ${title} Level ${index + 1}: ${item.title}`}
+            >
+              <div className="levelCardTopline">
+                <span>Level {index + 1}</span>
+                <strong>{locked ? "Locked" : record?.solved ? "Cleared" : "Open"}</strong>
+              </div>
+              <h2>{item.title}</h2>
+              <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
+              {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
+              {item.kind === "gate-design" ? <p className="levelModeTag">Gate design</p> : null}
+              <div className="levelCardStats">
+                <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
+                <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     );
   };
 
+  if (selectedMode) {
+    const title = selectedMode === "state-transfer" ? "State-to-state transfer" : "Unitary design";
+    const copy = selectedMode === "state-transfer"
+      ? "Solve Bloch-sphere target states with the fewest gates you can manage."
+      : "Build a gate operation by passing multiple probe-state tests with the same circuit.";
+    const modePuzzles = puzzlesForMode(selectedMode);
+    const modeComplete = completedCountForMode(selectedMode, progress);
+    const nextPuzzle = nextPuzzleForMode(selectedMode, progress);
+
+    return (
+      <main className="levelSelectScreen">
+        <section className="modeSubmenuHeader">
+          <button type="button" className="menuButton" onClick={() => setSelectedMode(null)}>
+            Back to modes
+          </button>
+          <div className="modeSubmenuCopy">
+            <p className="eyebrow">{selectedMode === "state-transfer" ? "State mode" : "Design mode"}</p>
+            <h1>{title}</h1>
+            <p>{copy}</p>
+          </div>
+          <div className="modeSubmenuActions">
+            <strong>{modeComplete} / {modePuzzles.length} cleared</strong>
+            <button type="button" className="primaryButton" onClick={() => startPuzzle(nextPuzzle.id)}>
+              {modeComplete === modePuzzles.length ? "Review first level" : `Continue: ${nextPuzzle.title}`}
+            </button>
+          </div>
+        </section>
+
+        <section className="modeLevelSection" aria-label={`${title} levels`}>
+          {renderLevelCards(selectedMode, title)}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="levelSelectScreen">
-      <section className="levelHero">
+      <section className="levelHero mainMenuHero">
         <div className="levelHeroCopy">
           <h1>QUBIT GOLF</h1>
           <p>
@@ -900,53 +924,74 @@ function LevelSelectScreen({
           ) : null}
         </div>
 
-        <div className="xpCard" aria-label="Player progress">
-          <span>Rank {rank}</span>
-          <strong>{availableXp} XP</strong>
-          <div className="xpBar" aria-hidden="true">
-            <span style={{ width: `${xpPercent}%` }} />
+        <div className="menuHeroSide">
+          <MenuGraphic />
+          <div className="xpCard" aria-label="Player progress">
+            <span>Rank {rank}</span>
+            <strong>{availableXp} XP</strong>
+            <div className="xpBar" aria-hidden="true">
+              <span style={{ width: `${xpPercent}%` }} />
+            </div>
+            <p>{totalXp} earned / {spentXp} spent</p>
+            <small>{xpIntoRank} / {RANK_XP} XP to next rank</small>
+            <small>{completedCount} / {PUZZLES.length} levels cleared</small>
+            <button type="button" className="textButton resetProgressButton" onClick={resetProgress} disabled={totalXp === 0 && completedCount === 0}>
+              Reset progress
+            </button>
           </div>
-          <p>{totalXp} earned / {spentXp} spent</p>
-          <small>{xpIntoRank} / {RANK_XP} XP to next rank</small>
-          <small>{completedCount} / {PUZZLES.length} levels cleared</small>
-          <button type="button" className="textButton resetProgressButton" onClick={resetProgress} disabled={totalXp === 0 && completedCount === 0}>
-            Reset progress
-          </button>
         </div>
       </section>
 
       <section className="modeCardGrid" aria-label="Game modes">
-        <button type="button" className="modeCard sandboxModeCard" onClick={startSandbox}>
+        <button type="button" className="modeCard sandboxModeCard" onClick={startSandbox} aria-label="Start sandbox">
           <span>Mode 1</span>
           <h2>Sandbox</h2>
           <p>Try any sequence with all standard gates. No target, no score, just motion.</p>
           <strong>Start sandbox</strong>
         </button>
-        <button type="button" className="modeCard" onClick={() => startPuzzle(stateNext.id)}>
+        <button type="button" className="modeCard" onClick={() => setSelectedMode("state-transfer")} aria-label="Open State-to-state transfer levels">
           <span>Mode 2</span>
           <h2>State-to-state transfer</h2>
           <p>Move |0⟩ to a specific target state with a short circuit.</p>
-          <strong>{stateComplete === statePuzzles.length ? "Review levels" : `Continue: ${stateNext.title}`}</strong>
+          <strong>{stateComplete} / {statePuzzles.length} cleared · View levels</strong>
         </button>
-        <button type="button" className="modeCard" onClick={() => startPuzzle(designNext.id)}>
+        <button type="button" className="modeCard" onClick={() => setSelectedMode("unitary-design")} aria-label="Open Unitary design levels">
           <span>Mode 3</span>
           <h2>Unitary design</h2>
           <p>Build one circuit that transforms several probe states correctly.</p>
-          <strong>{designComplete === designPuzzles.length ? "Review levels" : `Continue: ${designNext.title}`}</strong>
+          <strong>{designComplete} / {designPuzzles.length} cleared · View levels</strong>
         </button>
       </section>
-
-      {renderLevelSection(
-        "state-transfer",
-        "State-to-state transfer",
-        "Solve Bloch-sphere target states with the fewest gates you can manage.",
-      )}
-      {renderLevelSection(
-        "unitary-design",
-        "Unitary design",
-        "Build a gate operation by passing multiple probe-state tests with the same circuit.",
-      )}
     </main>
+  );
+}
+
+function MenuGraphic() {
+  return (
+    <section className="quantumMenuGraphic" aria-label="Decorative Bloch sphere and quantum circuit">
+      <div className="menuBlochSphere" aria-hidden="true">
+        <span className="sphereGlow" />
+        <span className="sphereRing ringEquator" />
+        <span className="sphereRing ringMeridianA" />
+        <span className="sphereRing ringMeridianB" />
+        <span className="sphereAxis axisX" />
+        <span className="sphereAxis axisY" />
+        <span className="sphereAxis axisZ" />
+        <span className="sphereVector vectorCyan" />
+        <span className="sphereVector vectorCoral" />
+        <span className="spherePoint pointCyan" />
+        <span className="spherePoint pointCoral" />
+      </div>
+      <div className="menuCircuitGraphic" aria-hidden="true">
+        <span className="miniKet">|0⟩</span>
+        <span className="miniWire" />
+        <span className="miniGate">H</span>
+        <span className="miniGate">T</span>
+        <span className="miniGate">S⁻¹</span>
+        <span className="miniWire" />
+        <span className="miniKet">|ψ⟩</span>
+      </div>
+    </section>
   );
 }
 

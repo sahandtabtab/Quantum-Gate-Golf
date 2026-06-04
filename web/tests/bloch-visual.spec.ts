@@ -73,7 +73,8 @@ test("solving the final level opens the certificate screen", async ({ page }) =>
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
-  await page.getByRole("button", { name: /Continue: Design Y gate/ }).click();
+  await page.getByRole("button", { name: /Open Unitary design levels/ }).click();
+  await page.getByRole("button", { name: /Start Unitary design Level 5: Design Y gate/ }).click();
 
   const finalPuzzle = PUZZLES[PUZZLES.length - 1];
   for (const gateName of finalPuzzle.solution) {
@@ -134,6 +135,7 @@ async function openAndCheckScene(page: Page, name: string) {
 async function startFirstLevel(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Open State-to-state transfer levels/ }).click();
   await page.getByRole("button", { name: /Start State-to-state transfer Level 1/ }).click();
   await expect(page.getByRole("button", { name: /^H/ })).toBeVisible();
   await expect(page.getByText("Solved").first()).not.toBeVisible();

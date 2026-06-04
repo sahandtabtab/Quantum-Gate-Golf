@@ -75,9 +75,20 @@ button:disabled {
   margin-bottom: 22px;
 }
 
+.mainMenuHero {
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
+}
+
+.menuHeroSide {
+  display: grid;
+  gap: 14px;
+}
+
 .levelHeroCopy,
 .xpCard,
-.levelCard {
+.levelCard,
+.quantumMenuGraphic,
+.modeSubmenuHeader {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(9, 25, 34, 0.82);
@@ -128,6 +139,243 @@ button:disabled {
 
 .levelHeroActions .primaryButton {
   margin-top: 0;
+}
+
+.quantumMenuGraphic {
+  position: relative;
+  min-height: 318px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(17, 213, 255, 0.22), transparent 36%),
+    radial-gradient(circle at 70% 74%, rgba(255, 79, 114, 0.12), transparent 34%),
+    rgba(9, 25, 34, 0.82);
+}
+
+.quantumMenuGraphic::before {
+  position: absolute;
+  inset: 18px;
+  border: 1px solid rgba(101, 229, 255, 0.12);
+  border-radius: 999px;
+  content: "";
+  filter: blur(1px);
+}
+
+.menuBlochSphere {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  width: 210px;
+  height: 210px;
+  border: 1px solid rgba(101, 229, 255, 0.38);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(234, 247, 251, 0.22), transparent 16%),
+    radial-gradient(circle, rgba(141, 219, 229, 0.18), rgba(141, 219, 229, 0.07) 54%, rgba(9, 25, 34, 0.4));
+  box-shadow:
+    0 0 46px rgba(17, 213, 255, 0.24),
+    inset 0 0 36px rgba(101, 229, 255, 0.14);
+  transform: translateX(-50%);
+}
+
+.sphereGlow,
+.sphereRing,
+.sphereAxis,
+.sphereVector,
+.spherePoint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+}
+
+.sphereGlow {
+  width: 126px;
+  height: 126px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(17, 213, 255, 0.16), transparent 68%);
+  transform: translate(-50%, -50%);
+}
+
+.sphereRing {
+  width: 174px;
+  height: 174px;
+  border: 1px solid rgba(101, 229, 255, 0.26);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ringEquator {
+  transform: translate(-50%, -50%) scaleY(0.35);
+}
+
+.ringMeridianA {
+  transform: translate(-50%, -50%) rotate(34deg) scaleX(0.45);
+}
+
+.ringMeridianB {
+  transform: translate(-50%, -50%) rotate(-42deg) scaleX(0.42);
+}
+
+.sphereAxis {
+  width: 166px;
+  height: 1px;
+  background: rgba(216, 245, 255, 0.34);
+}
+
+.axisX {
+  transform: translate(-50%, -50%) rotate(-24deg);
+}
+
+.axisY {
+  transform: translate(-50%, -50%) rotate(31deg);
+}
+
+.axisZ {
+  width: 1px;
+  height: 176px;
+  transform: translate(-50%, -50%);
+}
+
+.sphereVector {
+  height: 5px;
+  border-radius: 999px;
+  transform-origin: 0 50%;
+}
+
+.sphereVector::after {
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  content: "";
+  transform: translateY(-50%);
+}
+
+.vectorCyan {
+  width: 76px;
+  background: var(--cyan);
+  box-shadow: 0 0 16px rgba(17, 213, 255, 0.42);
+  transform: translate(0, -50%) rotate(-34deg);
+}
+
+.vectorCyan::after {
+  border-left: 12px solid var(--cyan);
+}
+
+.vectorCoral {
+  width: 68px;
+  background: var(--coral);
+  box-shadow: 0 0 16px rgba(255, 79, 114, 0.38);
+  transform: translate(0, -50%) rotate(42deg);
+}
+
+.vectorCoral::after {
+  border-left: 12px solid var(--coral);
+}
+
+.spherePoint {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.pointCyan {
+  background: var(--cyan);
+  box-shadow: 0 0 22px rgba(17, 213, 255, 0.65);
+  margin-left: 63px;
+  margin-top: -43px;
+}
+
+.pointCoral {
+  background: var(--coral);
+  box-shadow: 0 0 22px rgba(255, 79, 114, 0.6);
+  margin-left: 50px;
+  margin-top: 46px;
+}
+
+.menuCircuitGraphic {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 13px 12px;
+  border: 1px solid rgba(101, 229, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(7, 18, 25, 0.7);
+}
+
+.miniKet {
+  color: var(--cyan-dark);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-weight: 800;
+}
+
+.miniWire {
+  height: 2px;
+  min-width: 16px;
+  background: linear-gradient(90deg, transparent, rgba(101, 229, 255, 0.72), transparent);
+}
+
+.miniGate {
+  display: inline-grid;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(101, 229, 255, 0.58);
+  border-radius: 8px;
+  background: rgba(17, 213, 255, 0.13);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.modeSubmenuHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: center;
+  width: min(1180px, 100%);
+  margin: 0 auto 24px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.modeSubmenuCopy h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  line-height: 0.95;
+}
+
+.modeSubmenuCopy p:not(.eyebrow) {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.modeSubmenuActions {
+  display: grid;
+  justify-items: end;
+}
+
+.modeSubmenuActions strong {
+  color: var(--cyan-dark);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.modeSubmenuActions .primaryButton {
+  margin-top: 12px;
 }
 
 .xpCard {
@@ -871,6 +1119,14 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .modeSubmenuHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .modeSubmenuActions {
+    justify-items: start;
+  }
+
   .modeCardGrid {
     grid-template-columns: 1fr;
   }
@@ -945,13 +1201,52 @@ select {
 
   .levelHeroCopy,
   .xpCard,
-  .levelCard {
+  .levelCard,
+  .quantumMenuGraphic,
+  .modeSubmenuHeader {
     box-shadow: none;
   }
 
   .levelHeroCopy,
   .xpCard {
     padding: 18px;
+  }
+
+  .quantumMenuGraphic {
+    min-height: 260px;
+  }
+
+  .menuBlochSphere {
+    top: 18px;
+    width: 174px;
+    height: 174px;
+  }
+
+  .sphereRing {
+    width: 142px;
+    height: 142px;
+  }
+
+  .sphereAxis {
+    width: 136px;
+  }
+
+  .axisZ {
+    height: 146px;
+  }
+
+  .menuCircuitGraphic {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    gap: 5px;
+    padding: 10px;
+  }
+
+  .miniGate {
+    min-width: 29px;
+    height: 29px;
+    font-size: 0.72rem;
   }
 
   .levelHeroCopy h1 {
