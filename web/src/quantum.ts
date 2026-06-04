@@ -88,9 +88,12 @@ export const STANDARD_GATES: Record<string, Gate> = {
 
 const STATE_ZERO = INITIAL_STATE;
 const STATE_PLUS_X = stateFromBloch(Math.PI / 2, 0);
-const STATE_MINUS_X = stateFromBloch(Math.PI / 2, Math.PI);
 const STATE_PLUS_Y = stateFromBloch(Math.PI / 2, Math.PI / 2);
-const STATE_MINUS_Y = stateFromBloch(Math.PI / 2, -Math.PI / 2);
+const DESIGN_PROBES: Array<[label: string, startLabel: string, startState: QubitState]> = [
+  ["+X probe", "|+x⟩", STATE_PLUS_X],
+  ["+Y probe", "|+y⟩", STATE_PLUS_Y],
+  ["North pole", "|0⟩", STATE_ZERO],
+];
 
 export const SANDBOX_PUZZLE: Puzzle = {
   id: "sandbox",
@@ -277,11 +280,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Gate design: no X gate",
     kind: "gate-design",
     mission: "Build one circuit that behaves like an X gate on every probe state.",
-    cases: operationCases(["X"], [
-      ["North pole", "|0⟩", STATE_ZERO],
-      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
-      ["-X probe", "|-x⟩", STATE_MINUS_X],
-    ]),
+    cases: operationCases(["X"], DESIGN_PROBES),
   },
   {
     id: "design_z_no_z",
@@ -293,11 +292,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Gate design: no Z gate",
     kind: "gate-design",
     mission: "Build one circuit that behaves like a Z gate on every probe state.",
-    cases: operationCases(["Z"], [
-      ["+X probe", "|+x⟩", STATE_PLUS_X],
-      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
-      ["North pole", "|0⟩", STATE_ZERO],
-    ]),
+    cases: operationCases(["Z"], DESIGN_PROBES),
   },
   {
     id: "design_sdg_from_tdg",
@@ -309,11 +304,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Gate design: inverse phase",
     kind: "gate-design",
     mission: "Synthesize S⁻¹ from smaller phase rotations and pass every probe.",
-    cases: operationCases(["SDG"], [
-      ["+X probe", "|+x⟩", STATE_PLUS_X],
-      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
-      ["-Y probe", "|-y⟩", STATE_MINUS_Y],
-    ]),
+    cases: operationCases(["SDG"], DESIGN_PROBES),
   },
   {
     id: "design_tdg_without_tdg",
@@ -325,11 +316,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Gate design: no T⁻¹ gate",
     kind: "gate-design",
     mission: "Build a T⁻¹ operation without using the T⁻¹ button.",
-    cases: operationCases(["TDG"], [
-      ["+X probe", "|+x⟩", STATE_PLUS_X],
-      ["+Y probe", "|+y⟩", STATE_PLUS_Y],
-      ["-X probe", "|-x⟩", STATE_MINUS_X],
-    ]),
+    cases: operationCases(["TDG"], DESIGN_PROBES),
   },
   {
     id: "design_y_no_y",
@@ -341,11 +328,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Gate design: no Y gate",
     kind: "gate-design",
     mission: "Assemble a Y gate from phase shifts and a bit flip, then pass every probe.",
-    cases: operationCases(["Y"], [
-      ["North pole", "|0⟩", STATE_ZERO],
-      ["+X probe", "|+x⟩", STATE_PLUS_X],
-      ["-Y probe", "|-y⟩", STATE_MINUS_Y],
-    ]),
+    cases: operationCases(["Y"], DESIGN_PROBES),
   },
 ];
 

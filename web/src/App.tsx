@@ -10,6 +10,7 @@ import {
   formatAngles,
   formatState,
   puzzleCases,
+  stateFromBloch,
   sequenceStates,
 } from "./quantum";
 import type { Puzzle, PuzzleResult } from "./quantum";
@@ -19,6 +20,8 @@ const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
 const HINT_COST = 220;
 const AUDIO_VOLUME_MULTIPLIER = 2;
+const DEFAULT_SANDBOX_THETA = "0";
+const DEFAULT_SANDBOX_PHI = "0";
 const CELEBRATION_BITS = Array.from({ length: 18 }, (_, index) => ({
   delay: `${(index % 6) * 70}ms`,
   rotation: `${index * 37}deg`,
@@ -108,13 +111,35 @@ export default function App() {
   const [celebrationNonce, setCelebrationNonce] = useState(0);
   const [progress, setProgress] = useState<ProgressState>(() => loadProgress());
   const [draggedGateIndex, setDraggedGateIndex] = useState<number | null>(null);
+  const [sandboxThetaDegrees, setSandboxThetaDegrees] = useState(DEFAULT_SANDBOX_THETA);
+  const [sandboxPhiDegrees, setSandboxPhiDegrees] = useState(DEFAULT_SANDBOX_PHI);
   const revealedRunKeyRef = useRef("");
   const activeRunRef = useRef<ActiveRun | null>(null);
   const runTokenRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   const isSandbox = view === "sandbox";
-  const puzzle = isSandbox ? SANDBOX_PUZZLE : PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
+  const sandboxInitialState = useMemo(
+    () => stateFromBloch(
+      degreesToRadians(clampNumber(parseDegreeInput(sandboxThetaDegrees, 0), 0, 180)),
+      degreesToRadians(parseDegreeInput(sandboxPhiDegrees, 0)),
+    ),
+    [sandboxPhiDegrees, sandboxThetaDegrees],
+  );
+  const sandboxPuzzle = useMemo<Puzzle>(() => ({
+    ...SANDBOX_PUZZLE,
+    targetState: sandboxInitialState,
+    cases: [
+      {
+        label: "Sandbox",
+        startLabel: "|ψ₀⟩",
+        targetLabel: "|ψ⟩",
+        startState: sandboxInitialState,
+        targetState: sandboxInitialState,
+      },
+    ],
+  }), [sandboxInitialState]);
+  const puzzle = isSandbox ? sandboxPuzzle : PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
   const puzzleKind = puzzle.kind ?? "target";
   const activePuzzleCases = useMemo(() => puzzleCases(puzzle), [puzzle]);
   const primaryCase = activePuzzleCases[0];
@@ -167,6 +192,21 @@ export default function App() {
   useEffect(() => {
     saveProgress(progress);
   }, [progress]);
+
+  useEffect(() => {
+    if (!isSandbox) {
+      return;
+    }
+
+    setDisplaySequence([]);
+    setAnimationMode("to-final");
+    setShowTrajectory(false);
+    setIsRunning(false);
+    setResultRevealed(false);
+    activeRunRef.current = null;
+    revealedRunKeyRef.current = "";
+    setReplayNonce((current) => current + 1);
+  }, [isSandbox, sandboxInitialState]);
 
   const getAudioContext = () => {
     if (typeof window === "undefined") {
@@ -363,7 +403,7 @@ export default function App() {
 
   const reset = () => {
     playClick();
-    clearRun("Reset to |0\u27e9");
+    clearRun("Reset circuit");
   };
 
   const removeGate = (index: number) => {
@@ -530,6 +570,16 @@ export default function App() {
   };
 
   const readoutValue = (value: string) => (resultRevealed ? value : "--");
+
+  const setSandboxPreset = (thetaDegrees: string, phiDegrees: string) => {
+    if (isRunning) {
+      return;
+    }
+
+    playClick();
+    setSandboxThetaDegrees(thetaDegrees);
+    setSandboxPhiDegrees(phiDegrees);
+  };
 
   const renderCircuitPanel = (className: string) => (
     <section className={`floatingPanel circuitPanel ${className}`} aria-label="Draft quantum circuit">
@@ -720,6 +770,45 @@ export default function App() {
           </div>
         </div>
 
+        {isSandbox ? (
+          <section className="panelSection sandboxStatePanel" aria-label="Sandbox initial state">
+            <div className="sectionHeader">
+              <h3>Initial state</h3>
+              <span className="sandboxStateKet">|ψ₀⟩</span>
+            </div>
+            <div className="angleInputGrid">
+              <label>
+                <span>θ (deg)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="180"
+                  step="1"
+                  value={sandboxThetaDegrees}
+                  onChange={(event) => setSandboxThetaDegrees(event.target.value)}
+                  disabled={isRunning}
+                />
+              </label>
+              <label>
+                <span>φ (deg)</span>
+                <input
+                  type="number"
+                  step="1"
+                  value={sandboxPhiDegrees}
+                  onChange={(event) => setSandboxPhiDegrees(event.target.value)}
+                  disabled={isRunning}
+                />
+              </label>
+            </div>
+            <p className="sandboxStateReadout">{formatAngles(blochVector(sandboxInitialState))}</p>
+            <div className="presetRow" aria-label="Initial state presets">
+              <button type="button" className="statePresetButton" onClick={() => setSandboxPreset("0", "0")} disabled={isRunning}>|0⟩</button>
+              <button type="button" className="statePresetButton" onClick={() => setSandboxPreset("90", "0")} disabled={isRunning}>|+x⟩</button>
+              <button type="button" className="statePresetButton" onClick={() => setSandboxPreset("90", "90")} disabled={isRunning}>|+y⟩</button>
+            </div>
+          </section>
+        ) : null}
+
         {renderCircuitPanel("mobileCircuit")}
 
         <section className="panelSection gatesSection">
@@ -754,13 +843,19 @@ export default function App() {
                 <dd className="mathReadout">{formatAngles(result.targetBloch)}</dd>
               </div>
             ) : null}
+            {isSandbox ? (
+              <div>
+                <dt>Initial</dt>
+                <dd className="mathReadout">{formatAngles(blochVector(sandboxInitialState))}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Current</dt>
-              <dd className="mathReadout">{resultRevealed ? formatAngles(result.finalBloch) : "Run circuit to reveal."}</dd>
+              <dd className="mathReadout">{resultRevealed ? formatAngles(result.finalBloch) : isSandbox ? formatAngles(blochVector(sandboxInitialState)) : "Run circuit to reveal."}</dd>
             </div>
             <div>
               <dt>State</dt>
-              <dd>{resultRevealed ? formatState(result.finalState) : "Run circuit to reveal."}</dd>
+              <dd>{resultRevealed ? formatState(result.finalState) : isSandbox ? formatState(sandboxInitialState) : "Run circuit to reveal."}</dd>
             </div>
             {puzzleKind === "gate-design" ? (
               <div>
@@ -1058,6 +1153,19 @@ function CompletionScreen({
     </main>
   );
 }
+function parseDegreeInput(value: string, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function degreesToRadians(value: number): number {
+  return (value * Math.PI) / 180;
+}
+
+function clampNumber(value: number, low: number, high: number): number {
+  return Math.max(low, Math.min(high, value));
+}
+
 function pickHintGate(puzzle: Puzzle, sequence: string[]): string {
   const solution = puzzle.solution;
   if (solution.length === 0) {

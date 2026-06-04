@@ -19,7 +19,7 @@ test("mobile circuit wraps long sequences without horizontal scrolling", async (
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
   await page.getByRole("button", { name: /Start sandbox/ }).click();
-  await expect(page.getByRole("heading", { name: "Sandbox" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sandbox", exact: true })).toBeVisible();
 
   for (const gateName of ["H", "T", "H", "S", "TDG", "H", "SDG", "X"]) {
     await clickGate(page, gateName);
@@ -36,6 +36,26 @@ test("mobile circuit wraps long sequences without horizontal scrolling", async (
 
   expect(wireMetrics.scrollWidth).toBeLessThanOrEqual(wireMetrics.clientWidth + 1);
   expect(wireMetrics.height).toBeGreaterThan(70);
+});
+
+test("sandbox accepts custom initial Bloch angles", async ({ page }) => {
+  test.setTimeout(30000);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Start sandbox/ }).click();
+  await expect(page.getByRole("heading", { name: "Sandbox", exact: true })).toBeVisible();
+
+  const initialPanel = page.getByLabel("Sandbox initial state");
+  await initialPanel.getByRole("spinbutton", { name: /θ/ }).fill("90");
+  await initialPanel.getByRole("spinbutton", { name: /φ/ }).fill("0");
+  await expect(initialPanel.getByText("(θ, ϕ) = (90.00 deg, 0.00 deg)")).toBeVisible();
+
+  await clickGate(page, "H");
+  await page.getByRole("button", { name: "RUN" }).click();
+  await expect(page.getByLabel("Current result").getByText("1")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("(θ, ϕ) = (0.00 deg, 0.00 deg)")).toBeVisible({ timeout: 5000 });
 });
 
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {

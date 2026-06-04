@@ -974,6 +974,83 @@ select {
   color: var(--ink);
 }
 
+.sandboxStatePanel {
+  margin-top: 18px;
+}
+
+.sandboxStateKet {
+  color: var(--cyan-dark);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.angleInputGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.angleInputGrid label {
+  display: grid;
+  gap: 6px;
+}
+
+.angleInputGrid label span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.angleInputGrid input {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(11, 31, 42, 0.95);
+  color: var(--ink);
+  font: inherit;
+}
+
+.angleInputGrid input:focus {
+  border-color: rgba(17, 213, 255, 0.62);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(17, 213, 255, 0.12);
+}
+
+.sandboxStateReadout {
+  margin: 12px 0 0;
+  color: var(--cyan-dark);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-size: 0.95rem;
+}
+
+.presetRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.statePresetButton {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(101, 229, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(17, 213, 255, 0.1);
+  color: var(--ink);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-weight: 800;
+}
+
+.statePresetButton:hover:not(:disabled) {
+  border-color: rgba(17, 213, 255, 0.58);
+  box-shadow: 0 8px 18px rgba(17, 213, 255, 0.12);
+}
+
 .panelSection {
   margin-top: 26px;
   padding-top: 22px;
@@ -1596,7 +1673,7 @@ select {
   }
 
   .gatesSection {
-    order: 2;
+    order: 3;
     margin-top: 12px;
   }
 
@@ -1762,8 +1839,47 @@ select {
     font-size: 0.68rem;
   }
 
-  .controlPanel .mobileCircuit {
+  .sandboxStatePanel {
     order: 1;
+    margin-top: 0;
+    padding-top: 8px;
+  }
+
+  .sandboxStatePanel .sectionHeader {
+    margin-bottom: 6px;
+  }
+
+  .angleInputGrid {
+    gap: 6px;
+  }
+
+  .angleInputGrid input {
+    height: 32px;
+    font-size: 0.8rem;
+  }
+
+  .angleInputGrid label span {
+    font-size: 0.62rem;
+  }
+
+  .sandboxStateReadout {
+    margin-top: 6px;
+    font-size: 0.78rem;
+  }
+
+  .presetRow {
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .statePresetButton {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 0.78rem;
+  }
+
+  .controlPanel .mobileCircuit {
+    order: 2;
     margin: 0 0 8px;
     padding: 8px;
   }
@@ -1833,7 +1949,7 @@ select {
   }
 
   .gatesSection {
-    order: 2;
+    order: 3;
     margin-top: 0;
     padding-top: 8px;
   }
