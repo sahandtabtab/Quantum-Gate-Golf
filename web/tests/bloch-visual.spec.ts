@@ -58,6 +58,28 @@ test("sandbox accepts custom initial Bloch angles", async ({ page }) => {
   await expect(page.getByText("(θ, ϕ) = (0.00 deg, 0.00 deg)")).toBeVisible({ timeout: 5000 });
 });
 
+test("sandbox can animate unitary probe trio", async ({ page }) => {
+  test.setTimeout(35000);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Start sandbox/ }).click();
+  await expect(page.getByRole("heading", { name: "Sandbox", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Unitary probes" }).click();
+  await expect(page.getByLabel("Sandbox unitary probes").getByText("|0⟩")).toBeVisible();
+  await expect(page.getByLabel("Sandbox unitary probes").getByText("|+x⟩")).toBeVisible();
+  await expect(page.getByLabel("Sandbox unitary probes").getByText("|+y⟩")).toBeVisible();
+
+  await clickGate(page, "H");
+  await page.getByRole("button", { name: "RUN" }).click();
+  await expect(page.getByText("3 probe outputs")).toBeVisible({ timeout: 6000 });
+  await expect(page.getByText("|0⟩ probe")).toBeVisible();
+  await expect(page.getByText("|+x⟩ probe")).toBeVisible();
+  await expect(page.getByText("|+y⟩ probe")).toBeVisible();
+});
+
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
   await startFirstLevel(page);

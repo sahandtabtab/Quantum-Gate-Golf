@@ -13,7 +13,7 @@ import {
   stateFromBloch,
   sequenceStates,
 } from "./quantum";
-import type { Puzzle, PuzzleResult } from "./quantum";
+import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
@@ -22,6 +22,7 @@ const HINT_COST = 220;
 const AUDIO_VOLUME_MULTIPLIER = 2;
 const DEFAULT_SANDBOX_THETA = "0";
 const DEFAULT_SANDBOX_PHI = "0";
+type SandboxProbeMode = "single" | "trio";
 const CELEBRATION_BITS = Array.from({ length: 18 }, (_, index) => ({
   delay: `${(index % 6) * 70}ms`,
   rotation: `${index * 37}deg`,
@@ -112,6 +113,7 @@ export default function App() {
   const [progress, setProgress] = useState<ProgressState>(() => loadProgress());
   const [draggedGateIndex, setDraggedGateIndex] = useState<number | null>(null);
   const [sandboxThetaDegrees, setSandboxThetaDegrees] = useState(DEFAULT_SANDBOX_THETA);
+  const [sandboxProbeMode, setSandboxProbeMode] = useState<SandboxProbeMode>("single");
   const [sandboxPhiDegrees, setSandboxPhiDegrees] = useState(DEFAULT_SANDBOX_PHI);
   const revealedRunKeyRef = useRef("");
   const activeRunRef = useRef<ActiveRun | null>(null);
@@ -126,19 +128,26 @@ export default function App() {
     ),
     [sandboxPhiDegrees, sandboxThetaDegrees],
   );
-  const sandboxPuzzle = useMemo<Puzzle>(() => ({
-    ...SANDBOX_PUZZLE,
-    targetState: sandboxInitialState,
-    cases: [
+  const sandboxCases = useMemo<PuzzleCase[]>(() => {
+    if (sandboxProbeMode === "trio") {
+      return sandboxUnitaryProbeCases();
+    }
+
+    return [
       {
-        label: "Sandbox",
+        label: "Custom state",
         startLabel: "|ψ₀⟩",
         targetLabel: "|ψ⟩",
         startState: sandboxInitialState,
         targetState: sandboxInitialState,
       },
-    ],
-  }), [sandboxInitialState]);
+    ];
+  }, [sandboxInitialState, sandboxProbeMode]);
+  const sandboxPuzzle = useMemo<Puzzle>(() => ({
+    ...SANDBOX_PUZZLE,
+    targetState: sandboxCases[0]?.startState ?? sandboxInitialState,
+    cases: sandboxCases,
+  }), [sandboxCases, sandboxInitialState]);
   const puzzle = isSandbox ? sandboxPuzzle : PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
   const puzzleKind = puzzle.kind ?? "target";
   const activePuzzleCases = useMemo(() => puzzleCases(puzzle), [puzzle]);
@@ -154,16 +163,17 @@ export default function App() {
   const visibleGateOrder = GATE_ORDER.filter((gateName) => allowedGateSet.has(gateName));
   const states = useMemo(() => sequenceStates(displaySequence, primaryCase.startState), [displaySequence, primaryCase]);
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
+  const showProbeVectors = puzzleKind === "gate-design" || (isSandbox && sandboxProbeMode === "trio");
   const probeKeyVectors = useMemo(
-    () => puzzleKind === "gate-design"
+    () => showProbeVectors
       ? activePuzzleCases.map((puzzleCase) => sequenceStates(displaySequence, puzzleCase.startState).map(blochVector))
       : undefined,
-    [activePuzzleCases, displaySequence, puzzleKind],
+    [activePuzzleCases, displaySequence, showProbeVectors],
   );
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
   const solved = !isSandbox && resultRevealed && result.fidelity >= 0.999;
-  const circuitStartLabel = puzzleKind === "gate-design" ? "probes" : primaryCase.startLabel;
-  const circuitEndLabel = puzzleKind === "gate-design" ? "targets" : "|ψ⟩";
+  const circuitStartLabel = showProbeVectors ? "probes" : primaryCase.startLabel;
+  const circuitEndLabel = puzzleKind === "gate-design" ? "targets" : sandboxProbeMode === "trio" && isSandbox ? "outputs" : "|ψ⟩";
   const statusText = isSandbox
     ? isRunning && !resultRevealed
       ? "Running"
@@ -206,7 +216,7 @@ export default function App() {
     activeRunRef.current = null;
     revealedRunKeyRef.current = "";
     setReplayNonce((current) => current + 1);
-  }, [isSandbox, sandboxInitialState]);
+  }, [isSandbox, sandboxInitialState, sandboxProbeMode]);
 
   const getAudioContext = () => {
     if (typeof window === "undefined") {
@@ -581,6 +591,15 @@ export default function App() {
     setSandboxPhiDegrees(phiDegrees);
   };
 
+  const setSandboxProbeView = (mode: SandboxProbeMode) => {
+    if (isRunning || sandboxProbeMode === mode) {
+      return;
+    }
+
+    playClick();
+    setSandboxProbeMode(mode);
+  };
+
   const renderCircuitPanel = (className: string) => (
     <section className={`floatingPanel circuitPanel ${className}`} aria-label="Draft quantum circuit">
       <div className="sectionHeader circuitHeader">
@@ -774,8 +793,14 @@ export default function App() {
           <section className="panelSection sandboxStatePanel" aria-label="Sandbox initial state">
             <div className="sectionHeader">
               <h3>Initial state</h3>
-              <span className="sandboxStateKet">|ψ₀⟩</span>
+              <span className="sandboxStateKet">{sandboxProbeMode === "trio" ? "probes" : "|ψ₀⟩"}</span>
             </div>
+            <div className="sandboxProbeToggle" role="group" aria-label="Sandbox probe view">
+              <button type="button" className={sandboxProbeMode === "single" ? "active" : ""} onClick={() => setSandboxProbeView("single")} disabled={isRunning}>Single state</button>
+              <button type="button" className={sandboxProbeMode === "trio" ? "active" : ""} onClick={() => setSandboxProbeView("trio")} disabled={isRunning}>Unitary probes</button>
+            </div>
+            {sandboxProbeMode === "single" ? (
+            <>
             <div className="angleInputGrid">
               <label>
                 <span>θ (deg)</span>
@@ -806,6 +831,14 @@ export default function App() {
               <button type="button" className="statePresetButton" onClick={() => setSandboxPreset("90", "0")} disabled={isRunning}>|+x⟩</button>
               <button type="button" className="statePresetButton" onClick={() => setSandboxPreset("90", "90")} disabled={isRunning}>|+y⟩</button>
             </div>
+            </>
+            ) : (
+              <div className="sandboxProbeList" aria-label="Sandbox unitary probes">
+                <span>|0⟩</span>
+                <span>|+x⟩</span>
+                <span>|+y⟩</span>
+              </div>
+            )}
           </section>
         ) : null}
 
@@ -845,18 +878,32 @@ export default function App() {
             ) : null}
             {isSandbox ? (
               <div>
-                <dt>Initial</dt>
-                <dd className="mathReadout">{formatAngles(blochVector(sandboxInitialState))}</dd>
+                <dt>{sandboxProbeMode === "trio" ? "Initial probes" : "Initial"}</dt>
+                <dd className="mathReadout">{sandboxProbeMode === "trio" ? "|0⟩, |+x⟩, |+y⟩" : formatAngles(blochVector(sandboxInitialState))}</dd>
               </div>
             ) : null}
             <div>
               <dt>Current</dt>
-              <dd className="mathReadout">{resultRevealed ? formatAngles(result.finalBloch) : isSandbox ? formatAngles(blochVector(sandboxInitialState)) : "Run circuit to reveal."}</dd>
+              <dd className="mathReadout">{resultRevealed ? (sandboxProbeMode === "trio" && isSandbox ? `${result.cases.length} probe outputs` : formatAngles(result.finalBloch)) : isSandbox ? (sandboxProbeMode === "trio" ? "Run circuit to transform all probes." : formatAngles(blochVector(sandboxInitialState))) : "Run circuit to reveal."}</dd>
             </div>
-            <div>
-              <dt>State</dt>
-              <dd>{resultRevealed ? formatState(result.finalState) : isSandbox ? formatState(sandboxInitialState) : "Run circuit to reveal."}</dd>
-            </div>
+            {isSandbox && sandboxProbeMode === "trio" ? (
+              <div>
+                <dt>Probe outputs</dt>
+                <dd className="probeCaseList">
+                  {result.cases.map((caseResult) => (
+                    <span className="probeCase" key={caseResult.label}>
+                      <strong>{caseResult.label}</strong>
+                      <em>{caseResult.startLabel} → {resultRevealed ? formatAngles(caseResult.finalBloch) : "waiting for run"}</em>
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            ) : (
+              <div>
+                <dt>State</dt>
+                <dd>{resultRevealed ? formatState(result.finalState) : isSandbox ? formatState(sandboxInitialState) : "Run circuit to reveal."}</dd>
+              </div>
+            )}
             {puzzleKind === "gate-design" ? (
               <div>
                 <dt>Probe tests</dt>
@@ -1153,6 +1200,18 @@ function CompletionScreen({
     </main>
   );
 }
+function sandboxUnitaryProbeCases(): PuzzleCase[] {
+  const zeroState = stateFromBloch(0, 0);
+  const plusXState = stateFromBloch(Math.PI / 2, 0);
+  const plusYState = stateFromBloch(Math.PI / 2, Math.PI / 2);
+
+  return [
+    { label: "|0⟩ probe", startLabel: "|0⟩", targetLabel: "output", startState: zeroState, targetState: zeroState },
+    { label: "|+x⟩ probe", startLabel: "|+x⟩", targetLabel: "output", startState: plusXState, targetState: plusXState },
+    { label: "|+y⟩ probe", startLabel: "|+y⟩", targetLabel: "output", startState: plusYState, targetState: plusYState },
+  ];
+}
+
 function parseDegreeInput(value: string, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;

@@ -985,6 +985,54 @@ select {
   font-weight: 800;
 }
 
+.sandboxProbeToggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 4px;
+  border: 1px solid rgba(101, 229, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(7, 18, 25, 0.62);
+}
+
+.sandboxProbeToggle button {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.sandboxProbeToggle button.active {
+  border-color: rgba(101, 229, 255, 0.5);
+  background: rgba(17, 213, 255, 0.15);
+  color: var(--ink);
+  box-shadow: 0 0 16px rgba(17, 213, 255, 0.12);
+}
+
+.sandboxProbeList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sandboxProbeList span {
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  border: 1px solid rgba(101, 229, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(17, 213, 255, 0.1);
+  color: var(--ink);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-size: 1.02rem;
+  font-weight: 850;
+}
+
 .angleInputGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1847,6 +1895,27 @@ select {
 
   .sandboxStatePanel .sectionHeader {
     margin-bottom: 6px;
+  }
+
+  .sandboxProbeToggle {
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 3px;
+  }
+
+  .sandboxProbeToggle button {
+    min-height: 28px;
+    padding: 0 6px;
+    font-size: 0.68rem;
+  }
+
+  .sandboxProbeList {
+    gap: 5px;
+  }
+
+  .sandboxProbeList span {
+    min-height: 30px;
+    font-size: 0.82rem;
   }
 
   .angleInputGrid {
