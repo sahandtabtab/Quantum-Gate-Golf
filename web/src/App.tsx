@@ -783,7 +783,12 @@ export default function App() {
               ? `Free build cap: ${puzzle.gateLimit} gates.`
               : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
           </p>
-          {unitarySpec ? <p className="unitarySpecMeta">Target unitary: {unitarySpec}</p> : null}
+          {unitarySpec ? (
+            <p className="unitarySpecMeta">
+              <strong>Target unitary:</strong>
+              <span>{unitarySpec}</span>
+            </p>
+          ) : null}
           {puzzle.gateSetLabel ? <p className="gateSetMeta">{puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {puzzle.gateSetLabel}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>

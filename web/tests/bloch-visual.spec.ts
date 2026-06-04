@@ -13,7 +13,7 @@ test("mobile Bloch scene renders nonblank WebGL pixels", async ({ page }) => {
   await openAndCheckScene(page, "mobile");
 });
 
-test("mobile circuit wraps long sequences without horizontal scrolling", async ({ page }) => {
+test("mobile circuit keeps long sequences compact without horizontal scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
@@ -35,7 +35,7 @@ test("mobile circuit wraps long sequences without horizontal scrolling", async (
   });
 
   expect(wireMetrics.scrollWidth).toBeLessThanOrEqual(wireMetrics.clientWidth + 1);
-  expect(wireMetrics.height).toBeGreaterThan(70);
+  expect(wireMetrics.height).toBeLessThan(70);
 });
 
 test("sandbox accepts custom initial Bloch angles", async ({ page }) => {
