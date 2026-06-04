@@ -116,7 +116,8 @@ test("replaying a completed level does not reopen the certificate screen", async
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
   await page.getByRole("button", { name: /Open State-to-state transfer levels/ }).click();
-  await page.getByRole("button", { name: /Replay State-to-state transfer Level 1/ }).click();
+  await page.getByRole("button", { name: /^Replay State-to-state transfer Level 1:/ }).click();
+  await expect(page.getByText("Solved").first()).not.toBeVisible({ timeout: 500 });
   await page.getByRole("button", { name: /^H/ }).click();
   await page.getByRole("button", { name: "RUN" }).click();
 

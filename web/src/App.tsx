@@ -122,6 +122,7 @@ export default function App() {
   const [sandboxPhiDegrees, setSandboxPhiDegrees] = useState(DEFAULT_SANDBOX_PHI);
   const revealedRunKeyRef = useRef("");
   const activeRunRef = useRef<ActiveRun | null>(null);
+  const activeEntryKeyRef = useRef("");
   const runTokenRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
 
@@ -207,6 +208,30 @@ export default function App() {
   useEffect(() => {
     saveProgress(progress);
   }, [progress]);
+
+  useEffect(() => {
+    if (view !== "play" && view !== "sandbox") {
+      activeEntryKeyRef.current = "";
+      return;
+    }
+
+    const entryKey = `${view}:${puzzle.id}`;
+    if (activeEntryKeyRef.current === entryKey) {
+      return;
+    }
+
+    activeEntryKeyRef.current = entryKey;
+    setSequence([]);
+    setDisplaySequence([]);
+    setAnimationMode("to-final");
+    setShowTrajectory(false);
+    setIsRunning(false);
+    setResultRevealed(false);
+    setCelebrationNonce(0);
+    activeRunRef.current = null;
+    revealedRunKeyRef.current = "";
+    setReplayNonce((current) => current + 1);
+  }, [puzzle.id, view]);
 
   useEffect(() => {
     if (!isSandbox) {
@@ -758,7 +783,7 @@ export default function App() {
                 ? `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}. Design probes: ${activePuzzleCases.length}.`
                 : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
           </p>
-          {puzzle.gateSetLabel ? <p className="gateSetMeta">Gate set: {puzzle.gateSetLabel}</p> : null}
+          {puzzle.gateSetLabel ? <p className="gateSetMeta">{puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {puzzle.gateSetLabel}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
               Next level
@@ -859,7 +884,7 @@ export default function App() {
               Replay
             </button>
           </div>
-          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : puzzle.gateSetLabel ?? "All gates available"} - {gateUsageText}</p>
+          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : `${puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: ${puzzle.gateSetLabel ?? "All gates available"}`} - {gateUsageText}</p>
           <div className="gateGrid">
             {visibleGateOrder.map((gateName) => (
               <button
