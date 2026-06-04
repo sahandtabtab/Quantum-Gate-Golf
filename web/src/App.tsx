@@ -922,6 +922,26 @@ function LevelSelectScreen({
               View certificate
             </button>
           ) : null}
+          <section className="modeCardGrid mainMenuModes" aria-label="Game modes">
+            <button type="button" className="modeCard sandboxModeCard" onClick={startSandbox} aria-label="Start sandbox">
+              <span>Mode 1</span>
+              <h2>Sandbox</h2>
+              <p>Try any sequence with all standard gates. No target, no score, just motion.</p>
+              <strong>Start sandbox</strong>
+            </button>
+            <button type="button" className="modeCard" onClick={() => setSelectedMode("state-transfer")} aria-label="Open State-to-state transfer levels">
+              <span>Mode 2</span>
+              <h2>State-to-state transfer</h2>
+              <p>Move |0⟩ to a specific target state with a short circuit.</p>
+              <strong>{stateComplete} / {statePuzzles.length} cleared · View levels</strong>
+            </button>
+            <button type="button" className="modeCard" onClick={() => setSelectedMode("unitary-design")} aria-label="Open Unitary design levels">
+              <span>Mode 3</span>
+              <h2>Unitary design</h2>
+              <p>Build one circuit that transforms several probe states correctly.</p>
+              <strong>{designComplete} / {designPuzzles.length} cleared · View levels</strong>
+            </button>
+          </section>
         </div>
 
         <div className="menuHeroSide">
@@ -942,26 +962,6 @@ function LevelSelectScreen({
         </div>
       </section>
 
-      <section className="modeCardGrid" aria-label="Game modes">
-        <button type="button" className="modeCard sandboxModeCard" onClick={startSandbox} aria-label="Start sandbox">
-          <span>Mode 1</span>
-          <h2>Sandbox</h2>
-          <p>Try any sequence with all standard gates. No target, no score, just motion.</p>
-          <strong>Start sandbox</strong>
-        </button>
-        <button type="button" className="modeCard" onClick={() => setSelectedMode("state-transfer")} aria-label="Open State-to-state transfer levels">
-          <span>Mode 2</span>
-          <h2>State-to-state transfer</h2>
-          <p>Move |0⟩ to a specific target state with a short circuit.</p>
-          <strong>{stateComplete} / {statePuzzles.length} cleared · View levels</strong>
-        </button>
-        <button type="button" className="modeCard" onClick={() => setSelectedMode("unitary-design")} aria-label="Open Unitary design levels">
-          <span>Mode 3</span>
-          <h2>Unitary design</h2>
-          <p>Build one circuit that transforms several probe states correctly.</p>
-          <strong>{designComplete} / {designPuzzles.length} cleared · View levels</strong>
-        </button>
-      </section>
     </main>
   );
 }
