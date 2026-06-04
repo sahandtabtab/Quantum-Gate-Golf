@@ -824,6 +824,7 @@ button:disabled {
 }
 
 .circuitBoard {
+  --circuit-row-height: 62px;
   display: flex;
   align-items: stretch;
   gap: 12px;
@@ -837,11 +838,11 @@ button:disabled {
   font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
   font-size: 1.15rem;
   font-weight: 700;
+  min-height: var(--circuit-row-height);
   white-space: nowrap;
 }
 
 .circuitWire {
-  --circuit-row-height: 62px;
   position: relative;
   display: flex;
   flex: 1;
@@ -1626,6 +1627,14 @@ select {
   justify-content: center;
 }
 
+.circuitBoard.longCircuit .circuitStartKet {
+  align-self: flex-start;
+}
+
+.circuitBoard.longCircuit .circuitEndKet {
+  align-self: flex-end;
+}
+
 .circuitGateUnit {
   position: relative;
   z-index: 1;
@@ -1739,6 +1748,7 @@ select {
   }
 
   .circuitBoard {
+    --circuit-row-height: 56px;
     gap: 8px;
   }
 
@@ -1989,6 +1999,7 @@ select {
   }
 
   .circuitBoard {
+    --circuit-row-height: 48px;
     min-height: 44px;
     gap: 6px;
   }
@@ -2354,6 +2365,10 @@ select {
   }
 }
 @media (max-width: 380px) {
+  .circuitBoard {
+    --circuit-row-height: 44px;
+  }
+
   .circuitWire {
     --circuit-row-height: 44px;
     gap: 4px;

@@ -727,6 +727,6 @@ function toDisplayVector3(vector: Vec3): THREE.Vector3 {
   return new THREE.Vector3(
     DISPLAY_RADIUS * vector[0],
     DISPLAY_RADIUS * vector[2],
-    DISPLAY_RADIUS * vector[1],
+    -DISPLAY_RADIUS * vector[1],
   );
 }

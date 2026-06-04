@@ -651,8 +651,8 @@ export default function App() {
           </button>
         </div>
       </div>
-      <div className={`circuitBoard ${sequence.length === 0 ? "empty" : ""}`}>
-        <span className="circuitKet">{circuitStartLabel}</span>
+      <div className={`circuitBoard ${sequence.length === 0 ? "empty" : ""} ${sequence.length > 5 ? "longCircuit" : ""}`}>
+        <span className="circuitKet circuitStartKet">{circuitStartLabel}</span>
         <div className={`circuitWire ${sequence.length > 0 ? "filled" : ""}`} aria-label="Current gate sequence">
           {sequence.length === 0 ? (
             <span className="circuitEmpty">add gates</span>
@@ -700,7 +700,7 @@ export default function App() {
             ))
           )}
         </div>
-        <span className="circuitKet">{circuitEndLabel}</span>
+        <span className="circuitKet circuitEndKet">{circuitEndLabel}</span>
       </div>
     </section>
   );
