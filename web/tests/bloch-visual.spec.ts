@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { PUZZLES, STANDARD_GATES } from "../src/quantum";
+import { PUZZLES, STANDARD_GATES, type Puzzle } from "../src/quantum";
 
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 
@@ -108,6 +108,21 @@ test("solving a level shows late celebration and next-level action", async ({ pa
   await expect(page.getByRole("button", { name: "Next level" })).toBeVisible({ timeout: 10000 });
 });
 
+test("replaying a completed level does not reopen the certificate screen", async ({ page }) => {
+  test.setTimeout(45000);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await seedCompletedProgress(page);
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Open State-to-state transfer levels/ }).click();
+  await page.getByRole("button", { name: /Replay State-to-state transfer Level 1/ }).click();
+  await page.getByRole("button", { name: /^H/ }).click();
+  await page.getByRole("button", { name: "RUN" }).click();
+
+  await expect(page.getByText("Solved").first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: "Certified Quantum Engineer!" })).not.toBeVisible({ timeout: 8000 });
+});
 test("solving the final level opens the certificate screen", async ({ page }) => {
   test.setTimeout(90000);
   await page.setViewportSize({ width: 1280, height: 840 });
@@ -115,10 +130,11 @@ test("solving the final level opens the certificate screen", async ({ page }) =>
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
-  await page.getByRole("button", { name: /Open Unitary design levels/ }).click();
-  await page.getByRole("button", { name: /Start Unitary design Level 5: Design Y gate/ }).click();
-
+  const designPuzzles = PUZZLES.filter((item) => item.kind === "gate-design");
   const finalPuzzle = PUZZLES[PUZZLES.length - 1];
+  const finalDesignLevel = designPuzzles.length;
+  await page.getByRole("button", { name: /Open Unitary design levels/ }).click();
+  await page.getByRole("button", { name: new RegExp(`Start Unitary design Level ${finalDesignLevel}: ${escapeRegex(finalPuzzle.title)}`) }).click();
   for (const gateName of finalPuzzle.solution) {
     await clickGate(page, gateName);
   }
@@ -184,8 +200,16 @@ async function startFirstLevel(page: Page) {
 }
 
 async function seedProgressThroughPenultimateLevel(page: Page) {
+  await seedProgressForPuzzles(page, PUZZLES.slice(0, -1));
+}
+
+async function seedCompletedProgress(page: Page) {
+  await seedProgressForPuzzles(page, PUZZLES);
+}
+
+async function seedProgressForPuzzles(page: Page, puzzles: Puzzle[]) {
   const progress = Object.fromEntries(
-    PUZZLES.slice(0, -1).map((item) => [
+    puzzles.map((item) => [
       item.id,
       {
         solved: true,

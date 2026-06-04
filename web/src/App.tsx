@@ -55,6 +55,7 @@ type ActiveRun = {
   puzzle: Puzzle;
   sequence: string[];
   result: PuzzleResult;
+  completesWholeGame: boolean;
 };
 
 type PuzzleMode = "state-transfer" | "unitary-design";
@@ -96,6 +97,10 @@ function isPuzzleUnlocked(puzzleId: string, progress: ProgressState): boolean {
 
 function allLevelsSolvedAfterRun(progress: ProgressState, solvedPuzzleId: string): boolean {
   return PUZZLES.every((item) => item.id === solvedPuzzleId || progress[item.id]?.solved);
+}
+
+function runCompletesWholeGame(progress: ProgressState, solvedPuzzleId: string): boolean {
+  return !progress[solvedPuzzleId]?.solved && allLevelsSolvedAfterRun(progress, solvedPuzzleId);
 }
 
 export default function App() {
@@ -485,7 +490,7 @@ export default function App() {
       return;
     }
 
-    if (allLevelsSolvedAfterRun(progress, activeRun.puzzle.id)) {
+    if (activeRun.completesWholeGame) {
       playFinale();
     } else {
       playWin();
@@ -519,13 +524,15 @@ export default function App() {
 
     playClick();
     const runSequence = [...sequence];
+    const runResult = evaluatePuzzle(puzzle, runSequence);
     const token = runTokenRef.current + 1;
     runTokenRef.current = token;
     activeRunRef.current = {
       token,
       puzzle,
       sequence: runSequence,
-      result: evaluatePuzzle(puzzle, runSequence),
+      result: runResult,
+      completesWholeGame: puzzle.kind !== "sandbox" && runResult.fidelity >= 0.999 && runCompletesWholeGame(progress, puzzle.id),
     };
 
     setDisplaySequence(runSequence);
@@ -553,6 +560,7 @@ export default function App() {
       puzzle,
       sequence: replaySequence,
       result: evaluatePuzzle(puzzle, replaySequence),
+      completesWholeGame: false,
     };
 
     setAnimationMode("replay");
@@ -573,7 +581,7 @@ export default function App() {
     setAnimationLabel("Idle");
     setIsRunning(false);
 
-    if (activeRun.result.fidelity >= 0.999 && allLevelsSolvedAfterRun(progress, activeRun.puzzle.id)) {
+    if (activeRun.completesWholeGame) {
       activeRunRef.current = null;
       setView("complete");
     }
