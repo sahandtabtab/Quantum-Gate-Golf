@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+﻿import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { gateRotation, rotateBlochVector, slerpUnit, smoothstep, type Vec3 } from "./quantum";
 
 type BlochSceneProps = {
   keyVectors: Vec3[];
+  probeKeyVectors?: Vec3[][];
   gateSequence: string[];
   targetVector: Vec3 | null;
   animationMode: "to-final" | "replay";
@@ -27,6 +28,20 @@ type BlochVectorParts = {
   headDiameter: number;
 };
 
+type ProbeStyle = {
+  color: number;
+  emissive: number;
+  emissiveIntensity: number;
+  trailColor: number;
+};
+
+type ProbeRuntime = {
+  keyVectors: Vec3[];
+  trailKeyVectors: Vec3[];
+  animationPath: Vec3[];
+  displayedVector: Vec3;
+};
+
 const NORTH_POLE: Vec3 = [0, 0, 1];
 const DISPLAY_RADIUS = 0.74;
 const VECTOR_UP = new THREE.Vector3(0, 1, 0);
@@ -35,9 +50,15 @@ const REPLAY_MIN_DURATION_MS = 2400;
 const REPLAY_GATE_DURATION_MS = 1500;
 const SETTLE_MIN_DURATION_MS = 900;
 const SETTLE_STEP_DURATION_MS = 650;
+const PROBE_STYLES: ProbeStyle[] = [
+  { color: 0x00a7d8, emissive: 0x00a7d8, emissiveIntensity: 0.16, trailColor: 0x11d5ff },
+  { color: 0xffd391, emissive: 0xffb84d, emissiveIntensity: 0.18, trailColor: 0xffd391 },
+  { color: 0x79f0bf, emissive: 0x1cab76, emissiveIntensity: 0.16, trailColor: 0x79f0bf },
+];
 
 export default function BlochScene({
   keyVectors,
+  probeKeyVectors,
   gateSequence,
   targetVector,
   animationMode,
@@ -49,9 +70,9 @@ export default function BlochScene({
   onAnimationComplete,
 }: BlochSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
-  const animationPathRef = useRef<Vec3[]>(keyVectors.length > 0 ? keyVectors : [NORTH_POLE]);
-  const trailKeyVectorsRef = useRef<Vec3[]>(keyVectors.length > 0 ? keyVectors : [NORTH_POLE]);
-  const displayedVectorRef = useRef<Vec3>(keyVectors[keyVectors.length - 1] ?? NORTH_POLE);
+  const probeRuntimesRef = useRef<ProbeRuntime[]>(
+    createProbeRuntimes(activeProbeSets(keyVectors, probeKeyVectors), [], animationMode, gateSequence),
+  );
   const targetVectorRef = useRef<Vec3 | null>(targetVector);
   const solvedRef = useRef(solved);
   const celebrationStartRef = useRef(0);
@@ -67,9 +88,9 @@ export default function BlochScene({
   const nearEndNotifiedRef = useRef(true);
   const completionNotifiedRef = useRef(true);
   const sceneObjectsRef = useRef<{
-    stateVector: BlochVectorParts;
+    stateVectors: BlochVectorParts[];
     targetVector: BlochVectorParts;
-    trailMesh: THREE.Mesh;
+    trailMeshes: THREE.Mesh[];
   } | null>(null);
 
   useEffect(() => {
@@ -82,16 +103,22 @@ export default function BlochScene({
   }, [solved]);
 
   useEffect(() => {
+    const probeSets = activeProbeSets(keyVectors, probeKeyVectors);
     targetVectorRef.current = targetVector;
-    trailKeyVectorsRef.current = keyVectors.length > 0 ? keyVectors : [NORTH_POLE];
     animationModeRef.current = animationMode;
     showTrajectoryRef.current = showTrajectory;
     gateSequenceRef.current = gateSequence;
     replayNonceRef.current = replayNonce;
-    animationPathRef.current = nextAnimationPath(keyVectors, displayedVectorRef.current, animationMode, gateSequence);
+    probeRuntimesRef.current = createProbeRuntimes(
+      probeSets,
+      probeRuntimesRef.current,
+      animationMode,
+      gateSequence,
+    );
+    const primaryPath = probeRuntimesRef.current[0]?.animationPath ?? [NORTH_POLE];
     const gateCount = animationMode === "replay" && gateSequence.length > 0
       ? gateSequence.length
-      : Math.max(1, animationPathRef.current.length - 1);
+      : Math.max(1, primaryPath.length - 1);
     durationRef.current = animationMode === "replay"
       ? Math.max(REPLAY_MIN_DURATION_MS, gateCount * REPLAY_GATE_DURATION_MS)
       : Math.max(SETTLE_MIN_DURATION_MS, gateCount * SETTLE_STEP_DURATION_MS);
@@ -100,7 +127,7 @@ export default function BlochScene({
     nearEndNotifiedRef.current = false;
     completionNotifiedRef.current = false;
     updateTarget();
-  }, [animationMode, gateSequence, keyVectors, replayNonce, showTrajectory, targetVector]);
+  }, [animationMode, gateSequence, keyVectors, probeKeyVectors, replayNonce, showTrajectory, targetVector]);
 
   useEffect(() => {
     if (celebrationNonce > 0) {
@@ -142,14 +169,14 @@ export default function BlochScene({
     scene.add(createAxes());
     scene.add(createAxisLabels());
 
-    const stateVector = createBlochVector({
-      color: 0x00a7d8,
-      emissive: 0x00a7d8,
-      emissiveIntensity: 0.16,
+    const stateVectors = PROBE_STYLES.map((style) => createBlochVector({
+      color: style.color,
+      emissive: style.emissive,
+      emissiveIntensity: style.emissiveIntensity,
       shaftRadius: 0.018,
       headLength: 0.12,
       headDiameter: 0.07,
-    });
+    }));
     const targetVectorObject = createBlochVector({
       color: 0xff3f5f,
       emissive: 0xff3f5f,
@@ -158,21 +185,24 @@ export default function BlochScene({
       headLength: 0.11,
       headDiameter: 0.06,
     });
-    const trailMesh = new THREE.Mesh(
-      new THREE.BufferGeometry(),
-      new THREE.MeshBasicMaterial({
-        color: 0x11d5ff,
-        transparent: true,
-        opacity: 0.94,
-        depthTest: false,
-      }),
-    );
-    trailMesh.renderOrder = 8;
+    const trailMeshes = PROBE_STYLES.map((style) => {
+      const trailMesh = new THREE.Mesh(
+        new THREE.BufferGeometry(),
+        new THREE.MeshBasicMaterial({
+          color: style.trailColor,
+          transparent: true,
+          opacity: 0.94,
+          depthTest: false,
+        }),
+      );
+      trailMesh.renderOrder = 8;
+      return trailMesh;
+    });
 
-    scene.add(trailMesh);
+    trailMeshes.forEach((trailMesh) => scene.add(trailMesh));
     scene.add(targetVectorObject.group);
-    scene.add(stateVector.group);
-    sceneObjectsRef.current = { stateVector, targetVector: targetVectorObject, trailMesh };
+    stateVectors.forEach((stateVector) => scene.add(stateVector.group));
+    sceneObjectsRef.current = { stateVectors, targetVector: targetVectorObject, trailMeshes };
     updateTarget();
 
     const resize = () => {
@@ -233,37 +263,48 @@ export default function BlochScene({
     if (!objects) {
       return;
     }
-    const path = animationPathRef.current;
     if (lastFrameTimeRef.current === 0) {
       lastFrameTimeRef.current = time;
     }
     progressRef.current = Math.min(1, Math.max(0, (time - lastFrameTimeRef.current) / durationRef.current));
     const progress = progressRef.current;
-    const current = currentAnimatedVector(
-      path,
-      progress,
-      animationModeRef.current,
-      gateSequenceRef.current,
-      trailKeyVectorsRef.current[0] ?? NORTH_POLE,
-    );
-    displayedVectorRef.current = current;
 
-    updateBlochVector(objects.stateVector, current);
-    updateTargetPulse(objects.targetVector, time);
+    objects.stateVectors.forEach((stateVector, index) => {
+      const runtime = probeRuntimesRef.current[index];
+      const trailMesh = objects.trailMeshes[index];
+      if (!runtime) {
+        stateVector.group.visible = false;
+        trailMesh.geometry.dispose();
+        trailMesh.geometry = new THREE.BufferGeometry();
+        return;
+      }
 
-    objects.trailMesh.geometry.dispose();
-    if (showTrajectoryRef.current) {
-      const trailPoints = buildDisplayedTrail(
-        trailKeyVectorsRef.current,
-        path,
+      const current = currentAnimatedVector(
+        runtime.animationPath,
         progress,
         animationModeRef.current,
         gateSequenceRef.current,
+        runtime.trailKeyVectors[0] ?? NORTH_POLE,
       );
-      objects.trailMesh.geometry = createTrailGeometry(trailPoints.map(toDisplayVector3));
-    } else {
-      objects.trailMesh.geometry = new THREE.BufferGeometry();
-    }
+      runtime.displayedVector = current;
+      updateBlochVector(stateVector, current);
+
+      trailMesh.geometry.dispose();
+      if (showTrajectoryRef.current) {
+        const trailPoints = buildDisplayedTrail(
+          runtime.trailKeyVectors,
+          runtime.animationPath,
+          progress,
+          animationModeRef.current,
+          gateSequenceRef.current,
+        );
+        trailMesh.geometry = createTrailGeometry(trailPoints.map(toDisplayVector3));
+      } else {
+        trailMesh.geometry = new THREE.BufferGeometry();
+      }
+    });
+
+    updateTargetPulse(objects.targetVector, time);
 
     if (animationModeRef.current === "replay" && progress >= 0.86 && !nearEndNotifiedRef.current) {
       nearEndNotifiedRef.current = true;
@@ -292,6 +333,33 @@ export default function BlochScene({
   }
 
   return <div className="sceneMount" data-testid="bloch-scene" ref={mountRef} />;
+}
+
+function activeProbeSets(primaryKeyVectors: Vec3[], probeKeyVectors: Vec3[][] | undefined): Vec3[][] {
+  const sets = probeKeyVectors?.length ? probeKeyVectors : [primaryKeyVectors];
+  return sets.slice(0, PROBE_STYLES.length).map(safeKeyVectorSet);
+}
+
+function createProbeRuntimes(
+  probeSets: Vec3[][],
+  previousRuntimes: ProbeRuntime[],
+  mode: "to-final" | "replay",
+  gateSequence: string[],
+): ProbeRuntime[] {
+  return probeSets.map((keyVectorSet, index) => {
+    const keyVectors = safeKeyVectorSet(keyVectorSet);
+    const previousDisplayed = previousRuntimes[index]?.displayedVector ?? keyVectors[keyVectors.length - 1] ?? NORTH_POLE;
+    return {
+      keyVectors,
+      trailKeyVectors: keyVectors,
+      animationPath: nextAnimationPath(keyVectors, previousDisplayed, mode, gateSequence),
+      displayedVector: previousDisplayed,
+    };
+  });
+}
+
+function safeKeyVectorSet(vectors: Vec3[] | undefined): Vec3[] {
+  return vectors && vectors.length > 0 ? vectors : [NORTH_POLE];
 }
 
 function createSphere(): THREE.Group {
@@ -347,8 +415,8 @@ function createAxisLabels(): THREE.Group {
     ["-x", [-1.3, 0, 0]],
     ["+y", [0, 1.3, 0]],
     ["-y", [0, -1.3, 0]],
-    ["|0\u27e9", [0, 0, 1.34]],
-    ["|1\u27e9", [0, 0, -1.34]],
+    ["|0⟩", [0, 0, 1.34]],
+    ["|1⟩", [0, 0, -1.34]],
   ];
 
   for (const [label, position] of labels) {
@@ -558,6 +626,7 @@ function buildGateRotationTrail(startVector: Vec3, gateSequence: string[], progr
 
   return points;
 }
+
 function buildDisplayedTrail(
   keyVectors: Vec3[],
   animationPath: Vec3[],
@@ -661,4 +730,3 @@ function toDisplayVector3(vector: Vec3): THREE.Vector3 {
     DISPLAY_RADIUS * vector[1],
   );
 }
-

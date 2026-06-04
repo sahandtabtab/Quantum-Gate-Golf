@@ -60,7 +60,9 @@ button:disabled {
 }
 
 .levelHero,
-.levelCardGrid {
+.levelCardGrid,
+.modeCardGrid,
+.modeLevelSection {
   width: min(1180px, 100%);
   margin: 0 auto;
 }
@@ -175,6 +177,101 @@ button:disabled {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--cyan), var(--coral));
+}
+
+.modeCardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.modeCard {
+  min-height: 190px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(9, 25, 34, 0.82);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+  text-align: left;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.modeCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(17, 213, 255, 0.52);
+  box-shadow: 0 16px 34px rgba(17, 213, 255, 0.13);
+}
+
+.modeCard span {
+  color: var(--cyan-dark);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.modeCard h2 {
+  margin: 18px 0 8px;
+  color: var(--ink);
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.modeCard p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.modeCard strong {
+  display: block;
+  margin-top: 22px;
+  color: var(--cyan-dark);
+  font-size: 0.95rem;
+}
+
+.sandboxModeCard {
+  border-color: rgba(101, 229, 255, 0.34);
+  background: linear-gradient(135deg, rgba(17, 213, 255, 0.14), rgba(9, 25, 34, 0.84));
+}
+
+.modeLevelSection {
+  margin-top: 26px;
+}
+
+.modeSectionHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.modeSectionHeader h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.45rem, 3vw, 2.2rem);
+}
+
+.modeSectionHeader p:not(.eyebrow) {
+  max-width: 680px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.modeSectionHeader strong {
+  flex: 0 0 auto;
+  color: var(--cyan-dark);
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .levelCardGrid {
@@ -774,6 +871,10 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .modeCardGrid {
+    grid-template-columns: 1fr;
+  }
+
   .levelCardGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -868,6 +969,11 @@ select {
 
   .levelHeroActions .sandboxButton {
     width: 100%;
+  }
+
+  .modeSectionHeader {
+    align-items: start;
+    flex-direction: column;
   }
 
   .levelCardGrid {

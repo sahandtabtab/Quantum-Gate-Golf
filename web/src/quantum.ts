@@ -274,7 +274,7 @@ export const PUZZLES: Puzzle[] = [
     gateLimit: 3,
     solution: ["H", "Z", "H"],
     allowedGates: ["H", "Z", "S", "SDG", "T", "TDG"],
-    gateSetLabel: "Robust design: no X gate",
+    gateSetLabel: "Gate design: no X gate",
     kind: "gate-design",
     mission: "Build one circuit that behaves like an X gate on every probe state.",
     cases: operationCases(["X"], [
@@ -290,7 +290,7 @@ export const PUZZLES: Puzzle[] = [
     gateLimit: 3,
     solution: ["H", "X", "H"],
     allowedGates: ["H", "X", "S", "SDG", "T", "TDG"],
-    gateSetLabel: "Robust design: no Z gate",
+    gateSetLabel: "Gate design: no Z gate",
     kind: "gate-design",
     mission: "Build one circuit that behaves like a Z gate on every probe state.",
     cases: operationCases(["Z"], [
@@ -306,7 +306,7 @@ export const PUZZLES: Puzzle[] = [
     gateLimit: 2,
     solution: ["TDG", "TDG"],
     allowedGates: ["H", "T", "TDG", "Z"],
-    gateSetLabel: "Robust inverse phase",
+    gateSetLabel: "Gate design: inverse phase",
     kind: "gate-design",
     mission: "Synthesize S⁻¹ from smaller phase rotations and pass every probe.",
     cases: operationCases(["SDG"], [
@@ -322,7 +322,7 @@ export const PUZZLES: Puzzle[] = [
     gateLimit: 2,
     solution: ["SDG", "T"],
     allowedGates: ["H", "S", "SDG", "T", "Z"],
-    gateSetLabel: "Robust design: no T⁻¹ gate",
+    gateSetLabel: "Gate design: no T⁻¹ gate",
     kind: "gate-design",
     mission: "Build a T⁻¹ operation without using the T⁻¹ button.",
     cases: operationCases(["TDG"], [
@@ -338,7 +338,7 @@ export const PUZZLES: Puzzle[] = [
     gateLimit: 3,
     solution: ["S", "X", "SDG"],
     allowedGates: ["H", "X", "S", "SDG", "T", "TDG"],
-    gateSetLabel: "Robust design: no Y gate",
+    gateSetLabel: "Gate design: no Y gate",
     kind: "gate-design",
     mission: "Assemble a Y gate from phase shifts and a bit flip, then pass every probe.",
     cases: operationCases(["Y"], [

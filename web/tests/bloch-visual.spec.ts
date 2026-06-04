@@ -18,7 +18,7 @@ test("mobile circuit wraps long sequences without horizontal scrolling", async (
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
-  await page.getByRole("button", { name: "Sandbox mode" }).click();
+  await page.getByRole("button", { name: /Start sandbox/ }).click();
   await expect(page.getByRole("heading", { name: "Sandbox" })).toBeVisible();
 
   for (const gateName of ["H", "T", "H", "S", "TDG", "H", "SDG", "X"]) {
@@ -73,7 +73,7 @@ test("solving the final level opens the certificate screen", async ({ page }) =>
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
-  await page.getByRole("button", { name: /Continue:/ }).click();
+  await page.getByRole("button", { name: /Continue: Design Y gate/ }).click();
 
   const finalPuzzle = PUZZLES[PUZZLES.length - 1];
   for (const gateName of finalPuzzle.solution) {
@@ -134,7 +134,7 @@ async function openAndCheckScene(page: Page, name: string) {
 async function startFirstLevel(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
-  await page.getByRole("button", { name: /Start Level 1/ }).click();
+  await page.getByRole("button", { name: /Start State-to-state transfer Level 1/ }).click();
   await expect(page.getByRole("button", { name: /^H/ })).toBeVisible();
   await expect(page.getByText("Solved").first()).not.toBeVisible();
 }

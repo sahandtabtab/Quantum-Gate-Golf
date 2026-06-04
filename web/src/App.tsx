@@ -53,6 +53,47 @@ type ActiveRun = {
   result: PuzzleResult;
 };
 
+type PuzzleMode = "state-transfer" | "unitary-design";
+
+function puzzleModeFor(puzzle: Puzzle): PuzzleMode {
+  return puzzle.kind === "gate-design" ? "unitary-design" : "state-transfer";
+}
+
+function puzzlesForMode(mode: PuzzleMode): Puzzle[] {
+  return PUZZLES.filter((item) => puzzleModeFor(item) === mode);
+}
+
+function completedCountForMode(mode: PuzzleMode, progress: ProgressState): number {
+  return puzzlesForMode(mode).filter((item) => progress[item.id]?.solved).length;
+}
+
+function unlockedIndexForMode(mode: PuzzleMode, progress: ProgressState): number {
+  const modePuzzles = puzzlesForMode(mode);
+  const firstUnsolved = modePuzzles.findIndex((item) => !progress[item.id]?.solved);
+  return firstUnsolved === -1 ? modePuzzles.length - 1 : firstUnsolved;
+}
+
+function nextPuzzleForMode(mode: PuzzleMode, progress: ProgressState): Puzzle {
+  const modePuzzles = puzzlesForMode(mode);
+  return modePuzzles.find((item) => !progress[item.id]?.solved) ?? modePuzzles[0];
+}
+
+function isPuzzleUnlocked(puzzleId: string, progress: ProgressState): boolean {
+  const selectedPuzzle = PUZZLES.find((item) => item.id === puzzleId);
+  if (!selectedPuzzle) {
+    return false;
+  }
+
+  const mode = puzzleModeFor(selectedPuzzle);
+  const modePuzzles = puzzlesForMode(mode);
+  const modeIndex = modePuzzles.findIndex((item) => item.id === puzzleId);
+  return modeIndex >= 0 && modeIndex <= unlockedIndexForMode(mode, progress);
+}
+
+function allLevelsSolvedAfterRun(progress: ProgressState, solvedPuzzleId: string): boolean {
+  return PUZZLES.every((item) => item.id === solvedPuzzleId || progress[item.id]?.solved);
+}
+
 export default function App() {
   const [view, setView] = useState<GameView>("levels");
   const [puzzleId, setPuzzleId] = useState(PUZZLES[0]?.id ?? "plus_x");
@@ -77,7 +118,9 @@ export default function App() {
   const puzzleKind = puzzle.kind ?? "target";
   const activePuzzleCases = useMemo(() => puzzleCases(puzzle), [puzzle]);
   const primaryCase = activePuzzleCases[0];
-  const puzzleIndex = Math.max(0, PUZZLES.findIndex((item) => item.id === puzzle.id));
+  const activePuzzleMode = puzzleModeFor(puzzle);
+  const activeModePuzzles = isSandbox ? [] : puzzlesForMode(activePuzzleMode);
+  const puzzleIndex = Math.max(0, activeModePuzzles.findIndex((item) => item.id === puzzle.id));
   const allowedGateSet = useMemo(() => new Set(puzzle.allowedGates ?? GATE_ORDER), [puzzle]);
   const gateLimitReached = sequence.length >= puzzle.gateLimit;
   const gateUsageText = isSandbox
@@ -86,6 +129,12 @@ export default function App() {
   const visibleGateOrder = GATE_ORDER.filter((gateName) => allowedGateSet.has(gateName));
   const states = useMemo(() => sequenceStates(displaySequence, primaryCase.startState), [displaySequence, primaryCase]);
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
+  const probeKeyVectors = useMemo(
+    () => puzzleKind === "gate-design"
+      ? activePuzzleCases.map((puzzleCase) => sequenceStates(displaySequence, puzzleCase.startState).map(blochVector))
+      : undefined,
+    [activePuzzleCases, displaySequence, puzzleKind],
+  );
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
   const solved = !isSandbox && resultRevealed && result.fidelity >= 0.999;
   const circuitStartLabel = puzzleKind === "gate-design" ? "probes" : primaryCase.startLabel;
@@ -112,10 +161,7 @@ export default function App() {
   const availableXp = Math.max(0, totalXp - spentXp);
   const rank = Math.floor(totalXp / RANK_XP) + 1;
   const xpIntoRank = totalXp % RANK_XP;
-  const firstUnsolvedIndex = PUZZLES.findIndex((item) => !progress[item.id]?.solved);
-  const unlockedThrough = firstUnsolvedIndex === -1 ? PUZZLES.length - 1 : firstUnsolvedIndex;
-  const nextPuzzle = firstUnsolvedIndex === -1 ? PUZZLES[0] : PUZZLES[firstUnsolvedIndex];
-  const nextLevel = PUZZLES[puzzleIndex + 1];
+  const nextLevel = activeModePuzzles[puzzleIndex + 1];
   const finalPuzzleId = PUZZLES[PUZZLES.length - 1]?.id;
 
   useEffect(() => {
@@ -205,8 +251,7 @@ export default function App() {
 
   const startPuzzle = (nextPuzzleId: string) => {
     playClick();
-    const nextIndex = PUZZLES.findIndex((item) => item.id === nextPuzzleId);
-    if (nextIndex > unlockedThrough) {
+    if (!isPuzzleUnlocked(nextPuzzleId, progress)) {
       return;
     }
 
@@ -390,7 +435,7 @@ export default function App() {
       return;
     }
 
-    if (activeRun.puzzle.id === finalPuzzleId) {
+    if (allLevelsSolvedAfterRun(progress, activeRun.puzzle.id)) {
       playFinale();
     } else {
       playWin();
@@ -478,7 +523,7 @@ export default function App() {
     setAnimationLabel("Idle");
     setIsRunning(false);
 
-    if (activeRun.result.fidelity >= 0.999 && activeRun.puzzle.id === finalPuzzleId) {
+    if (activeRun.result.fidelity >= 0.999 && allLevelsSolvedAfterRun(progress, activeRun.puzzle.id)) {
       activeRunRef.current = null;
       setView("complete");
     }
@@ -503,7 +548,7 @@ export default function App() {
         </div>
       </div>
       <div className={`circuitBoard ${sequence.length === 0 ? "empty" : ""}`}>
-        <span className="circuitKet">{"|0\u27e9"}</span>
+        <span className="circuitKet">{circuitStartLabel}</span>
         <div className={`circuitWire ${sequence.length > 0 ? "filled" : ""}`} aria-label="Current gate sequence">
           {sequence.length === 0 ? (
             <span className="circuitEmpty">add gates</span>
@@ -551,7 +596,7 @@ export default function App() {
             ))
           )}
         </div>
-        <span className="circuitKet">{"|\u03c8\u27e9"}</span>
+        <span className="circuitKet">{circuitEndLabel}</span>
       </div>
     </section>
   );
@@ -578,8 +623,6 @@ export default function App() {
         spentXp={spentXp}
         rank={rank}
         xpIntoRank={xpIntoRank}
-        unlockedThrough={unlockedThrough}
-        nextPuzzle={nextPuzzle}
         startPuzzle={startPuzzle}
         resetProgress={resetProgress}
         showCompletion={() => { playClick(); setView("complete"); }}
@@ -594,7 +637,8 @@ export default function App() {
         <BlochScene
           keyVectors={keyVectors}
           gateSequence={displaySequence}
-          targetVector={isSandbox ? null : result.targetBloch}
+          targetVector={isSandbox || puzzleKind === "gate-design" ? null : result.targetBloch}
+          probeKeyVectors={probeKeyVectors}
           animationMode={animationMode}
           showTrajectory={showTrajectory}
           solved={solved}
@@ -634,7 +678,7 @@ export default function App() {
             {isSandbox
               ? `Free build cap: ${puzzle.gateLimit} gates.`
               : puzzleKind === "gate-design"
-                ? `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}. Probe tests: ${activePuzzleCases.length}.`
+                ? `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}. Design probes: ${activePuzzleCases.length}.`
                 : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
           </p>
           {puzzle.gateSetLabel ? <p className="gateSetMeta">Gate set: {puzzle.gateSetLabel}</p> : null}
@@ -672,7 +716,7 @@ export default function App() {
           </button>
           <h2>{isSandbox ? "Sandbox controls" : "Gate controls"}</h2>
           <div className="panelLevelMeta">
-            <span>{isSandbox ? "Free play" : `Level ${puzzleIndex + 1} of ${PUZZLES.length}`}</span>
+            <span>{isSandbox ? "Free play" : `Level ${puzzleIndex + 1} of ${activeModePuzzles.length}`}</span>
           </div>
         </div>
 
@@ -766,8 +810,6 @@ function LevelSelectScreen({
   spentXp,
   rank,
   xpIntoRank,
-  unlockedThrough,
-  nextPuzzle,
   startPuzzle,
   resetProgress,
   showCompletion,
@@ -779,8 +821,6 @@ function LevelSelectScreen({
   spentXp: number;
   rank: number;
   xpIntoRank: number;
-  unlockedThrough: number;
-  nextPuzzle: Puzzle;
   startPuzzle: (puzzleId: string) => void;
   resetProgress: () => void;
   showCompletion: () => void;
@@ -789,6 +829,61 @@ function LevelSelectScreen({
   const completedCount = PUZZLES.filter((item) => progress[item.id]?.solved).length;
   const allLevelsComplete = completedCount === PUZZLES.length;
   const xpPercent = Math.round((xpIntoRank / RANK_XP) * 100);
+  const statePuzzles = puzzlesForMode("state-transfer");
+  const designPuzzles = puzzlesForMode("unitary-design");
+  const stateNext = nextPuzzleForMode("state-transfer", progress);
+  const designNext = nextPuzzleForMode("unitary-design", progress);
+  const stateComplete = completedCountForMode("state-transfer", progress);
+  const designComplete = completedCountForMode("unitary-design", progress);
+
+  const renderLevelSection = (mode: PuzzleMode, title: string, copy: string) => {
+    const modePuzzles = puzzlesForMode(mode);
+    const unlockedThrough = unlockedIndexForMode(mode, progress);
+
+    return (
+      <section className="modeLevelSection" aria-label={`${title} levels`}>
+        <div className="modeSectionHeader">
+          <div>
+            <p className="eyebrow">{mode === "state-transfer" ? "State mode" : "Design mode"}</p>
+            <h2>{title}</h2>
+            <p>{copy}</p>
+          </div>
+          <strong>{completedCountForMode(mode, progress)} / {modePuzzles.length} cleared</strong>
+        </div>
+        <div className="levelCardGrid">
+          {modePuzzles.map((item, index) => {
+            const record = progress[item.id];
+            const locked = index > unlockedThrough;
+            const action = record?.solved ? "Replay" : "Start";
+
+            return (
+              <button
+                type="button"
+                className={`levelCard ${record?.solved ? "cleared" : ""} ${locked ? "locked" : ""}`}
+                key={item.id}
+                disabled={locked}
+                onClick={() => startPuzzle(item.id)}
+                aria-label={locked ? `${title} level ${index + 1} locked` : `${action} ${title} Level ${index + 1}: ${item.title}`}
+              >
+                <div className="levelCardTopline">
+                  <span>Level {index + 1}</span>
+                  <strong>{locked ? "Locked" : record?.solved ? "Cleared" : "Open"}</strong>
+                </div>
+                <h2>{item.title}</h2>
+                <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
+                {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
+                {item.kind === "gate-design" ? <p className="levelModeTag">Gate design</p> : null}
+                <div className="levelCardStats">
+                  <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
+                  <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
 
   return (
     <main className="levelSelectScreen">
@@ -796,16 +891,13 @@ function LevelSelectScreen({
         <div className="levelHeroCopy">
           <h1>QUBIT GOLF</h1>
           <p>
-            Clear each target with short quantum circuits. New levels unlock as you solve the previous one.
+            Choose a mode: experiment freely, move one state to another, or design a full one-qubit unitary from gates.
           </p>
-          <div className="levelHeroActions">
-            <button type="button" className="primaryButton" onClick={() => allLevelsComplete ? showCompletion() : startPuzzle(nextPuzzle.id)}>
-              {allLevelsComplete ? "View certificate" : `Continue: ${nextPuzzle.title}`}
+          {allLevelsComplete ? (
+            <button type="button" className="primaryButton" onClick={showCompletion}>
+              View certificate
             </button>
-            <button type="button" className="menuButton sandboxButton" onClick={startSandbox}>
-              Sandbox mode
-            </button>
-          </div>
+          ) : null}
         </div>
 
         <div className="xpCard" aria-label="Player progress">
@@ -823,37 +915,37 @@ function LevelSelectScreen({
         </div>
       </section>
 
-      <section className="levelCardGrid" aria-label="Levels">
-        {PUZZLES.map((item, index) => {
-          const record = progress[item.id];
-          const locked = index > unlockedThrough;
-          const action = record?.solved ? "Replay" : "Start";
-
-          return (
-            <button
-              type="button"
-              className={`levelCard ${record?.solved ? "cleared" : ""} ${locked ? "locked" : ""}`}
-              key={item.id}
-              disabled={locked}
-              onClick={() => startPuzzle(item.id)}
-              aria-label={locked ? `Level ${index + 1} locked` : `${action} Level ${index + 1}: ${item.title}`}
-            >
-              <div className="levelCardTopline">
-                <span>Level {index + 1}</span>
-                <strong>{locked ? "Locked" : record?.solved ? "Cleared" : "Open"}</strong>
-              </div>
-              <h2>{item.title}</h2>
-              <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
-              {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
-              {item.kind === "gate-design" ? <p className="levelModeTag">Robust gate design</p> : null}
-              <div className="levelCardStats">
-                <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
-                <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>
-              </div>
-            </button>
-          );
-        })}
+      <section className="modeCardGrid" aria-label="Game modes">
+        <button type="button" className="modeCard sandboxModeCard" onClick={startSandbox}>
+          <span>Mode 1</span>
+          <h2>Sandbox</h2>
+          <p>Try any sequence with all standard gates. No target, no score, just motion.</p>
+          <strong>Start sandbox</strong>
+        </button>
+        <button type="button" className="modeCard" onClick={() => startPuzzle(stateNext.id)}>
+          <span>Mode 2</span>
+          <h2>State-to-state transfer</h2>
+          <p>Move |0⟩ to a specific target state with a short circuit.</p>
+          <strong>{stateComplete === statePuzzles.length ? "Review levels" : `Continue: ${stateNext.title}`}</strong>
+        </button>
+        <button type="button" className="modeCard" onClick={() => startPuzzle(designNext.id)}>
+          <span>Mode 3</span>
+          <h2>Unitary design</h2>
+          <p>Build one circuit that transforms several probe states correctly.</p>
+          <strong>{designComplete === designPuzzles.length ? "Review levels" : `Continue: ${designNext.title}`}</strong>
+        </button>
       </section>
+
+      {renderLevelSection(
+        "state-transfer",
+        "State-to-state transfer",
+        "Solve Bloch-sphere target states with the fewest gates you can manage.",
+      )}
+      {renderLevelSection(
+        "unitary-design",
+        "Unitary design",
+        "Build a gate operation by passing multiple probe-state tests with the same circuit.",
+      )}
     </main>
   );
 }

@@ -8,19 +8,20 @@ https://sahandtabtab.github.io/Quantum-Gate-Golf/
 
 ## Game Loop
 
-Most levels give you a target state and a maximum number of gates. Later robust gate-design levels ask you to build one circuit that passes several probe states, so the circuit behaves like a real gate rather than just solving one starting state.
+Qubit Golf has three modes: Sandbox, State-to-state transfer, and Unitary design. State-transfer levels give you a target state and a maximum number of gates. Unitary-design levels ask you to build one circuit that passes several probe states, so the circuit behaves like a real gate rather than just solving one starting state.
 
-1. Pick a level from the level menu.
-2. Build a circuit from the available gates.
-3. Reorder gates by dragging them, or use the small left/right controls.
-4. Remove individual gates with the `x` control.
-5. Press `RUN` to animate the full circuit.
-6. Clear the level by landing on the target state within the gate limit.
-7. Earn XP, unlock the next level, and spend XP on rare gate hints.
+1. Pick a mode from the main menu.
+2. Choose a level, or enter Sandbox for free play.
+3. Build a circuit from the available gates.
+4. Reorder gates by dragging them, or use the small left/right controls.
+5. Remove individual gates with the `x` control.
+6. Press `RUN` to animate the full circuit.
+7. Clear state-transfer levels by landing on the target state, or unitary-design levels by passing every probe.
+8. Earn XP, unlock the next level in that mode, and spend XP on rare gate hints.
 
 Hints add one gate from a good solution directly into your circuit. Progress and XP are stored locally in the browser, and can be reset from the level menu.
 
-Sandbox mode is available from the main menu. It has no XP, scoring, or target state; it is just a free space for trying gate sequences and studying the Bloch-sphere motion.
+Sandbox mode has no XP, scoring, or target state; it is just a free space for trying gate sequences and studying the Bloch-sphere motion.
 
 ## Development
 
