@@ -80,6 +80,29 @@ test("sandbox can animate unitary probe trio", async ({ page }) => {
   await expect(page.getByText("|+y⟩ probe")).toBeVisible();
 });
 
+test("unitary design readout uses unitary metrics instead of state metrics", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Open Unitary design levels/ }).click();
+  await page.getByRole("button", { name: /Start Unitary design Level 1/ }).click();
+
+  const status = page.getByLabel("Puzzle status");
+  await expect(status.getByText("Target unitary:")).toBeVisible();
+  await expect(status.getByText("Design probes")).not.toBeVisible();
+
+  const currentResult = page.getByLabel("Current result");
+  await expect(currentResult.getByText("Gate fidelity")).toBeVisible();
+  await expect(currentResult.getByText("Error")).not.toBeVisible();
+
+  const details = page.locator(".details");
+  await expect(details.getByText("Target unitary")).toBeVisible();
+  await expect(details.getByText("Gate fidelity")).toBeVisible();
+  await expect(details.getByText("Primary target")).not.toBeVisible();
+  await expect(details.getByText(/^State$/)).not.toBeVisible();
+});
+
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
   await startFirstLevel(page);

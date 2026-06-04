@@ -39,6 +39,7 @@ export type Puzzle = {
   kind?: "target" | "gate-design" | "sandbox";
   mission?: string;
   cases?: PuzzleCase[];
+  targetOperation?: string[];
 };
 
 export type PuzzleCaseResult = PuzzleCase & {
@@ -56,6 +57,7 @@ export type PuzzleResult = {
   fidelity: number;
   angularErrorDegrees: number;
   score: number;
+  gateFidelity: number;
   cases: PuzzleCaseResult[];
 };
 
@@ -280,6 +282,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "No X gate",
     kind: "gate-design",
     mission: "Build one circuit that behaves like an X gate on every probe state.",
+    targetOperation: ["X"],
     cases: operationCases(["X"], DESIGN_PROBES),
   },
   {
@@ -292,6 +295,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "No Z gate",
     kind: "gate-design",
     mission: "Build one circuit that behaves like a Z gate on every probe state.",
+    targetOperation: ["Z"],
     cases: operationCases(["Z"], DESIGN_PROBES),
   },
   {
@@ -304,6 +308,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Inverse phase",
     kind: "gate-design",
     mission: "Synthesize S⁻¹ from smaller phase rotations and pass every probe.",
+    targetOperation: ["SDG"],
     cases: operationCases(["SDG"], DESIGN_PROBES),
   },
   {
@@ -316,6 +321,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "No T⁻¹ gate",
     kind: "gate-design",
     mission: "Build a T⁻¹ operation without using the T⁻¹ button.",
+    targetOperation: ["TDG"],
     cases: operationCases(["TDG"], DESIGN_PROBES),
   },
   {
@@ -328,6 +334,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "No S gate",
     kind: "gate-design",
     mission: "Build the S phase gate using smaller T rotations, then pass every probe.",
+    targetOperation: ["S"],
     cases: operationCases(["S"], DESIGN_PROBES),
   },
   {
@@ -340,6 +347,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "No T gate",
     kind: "gate-design",
     mission: "Recover the T operation from a quarter phase and an inverse eighth phase.",
+    targetOperation: ["T"],
     cases: operationCases(["T"], DESIGN_PROBES),
   },
   {
@@ -352,6 +360,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Phase sandwich",
     kind: "gate-design",
     mission: "Turn a Z-axis phase rotation into a half X-axis flip by conjugating with H.",
+    targetOperation: ["H", "S", "H"],
     cases: operationCases(["H", "S", "H"], DESIGN_PROBES),
   },
   {
@@ -364,6 +373,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Inverse sandwich",
     kind: "gate-design",
     mission: "Build the inverse half-turn around X using an inverse phase sandwich.",
+    targetOperation: ["H", "SDG", "H"],
     cases: operationCases(["H", "SDG", "H"], DESIGN_PROBES),
   },
   {
@@ -376,6 +386,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "Mixed axes",
     kind: "gate-design",
     mission: "Compose H, T, and S so every probe experiences the same mixed-axis operation.",
+    targetOperation: ["H", "T", "S", "H"],
     cases: operationCases(["H", "T", "S", "H"], DESIGN_PROBES),
   },
   {
@@ -388,6 +399,7 @@ export const PUZZLES: Puzzle[] = [
     gateSetLabel: "No Y gate",
     kind: "gate-design",
     mission: "Assemble a Y gate from phase shifts and a bit flip, then pass every probe.",
+    targetOperation: ["Y"],
     cases: operationCases(["Y"], DESIGN_PROBES),
   },
 ];
@@ -457,6 +469,36 @@ function targetFromStateSequence(initialState: QubitState, sequence: string[]): 
   return states[states.length - 1] ?? initialState;
 }
 
+export function sequenceMatrix(sequence: string[]): Matrix2 {
+  let matrix = identityMatrix();
+
+  for (const gateName of sequence) {
+    const selectedGate = STANDARD_GATES[gateName.toUpperCase()];
+    if (!selectedGate) {
+      throw new Error(`Unknown gate: ${gateName}`);
+    }
+    matrix = matrixMultiply(selectedGate.matrix, matrix);
+  }
+
+  return matrix;
+}
+
+export function gateFidelityForSequence(sequence: string[], targetOperation: string[] = []): number {
+  const implemented = sequenceMatrix(sequence);
+  const target = sequenceMatrix(targetOperation);
+  const overlap = matrixTrace(matrixMultiply(matrixDagger(target), implemented));
+  return clamp(cAbs(overlap) / 2, 0, 1);
+}
+
+export function unitarySpecForPuzzle(puzzle: Puzzle): string | null {
+  return puzzle.kind === "gate-design" ? formatUnitarySpecForSequence(puzzle.targetOperation ?? puzzle.solution) : null;
+}
+
+export function formatUnitarySpecForSequence(sequence: string[]): string {
+  const { axis, angleDegrees } = unitaryAxisAngle(sequenceMatrix(sequence));
+  return `axis n = (${formatSigned(axis[0])}, ${formatSigned(axis[1])}, ${formatSigned(axis[2])}), angle \u03b8 = ${angleDegrees.toFixed(1)} deg`;
+}
+
 function operationCases(
   operation: string[],
   probes: Array<[label: string, startLabel: string, startState: QubitState]>,
@@ -488,7 +530,11 @@ export function angularErrorDegrees(state: QubitState, target: QubitState): numb
 export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult {
   const caseResults = puzzleCases(puzzle).map((puzzleCase) => evaluatePuzzleCase(puzzleCase, sequence));
   const primaryCase = caseResults[0];
-  const accuracy = Math.min(...caseResults.map((item) => item.fidelity));
+  const stateAccuracy = Math.min(...caseResults.map((item) => item.fidelity));
+  const gateFidelity = puzzle.kind === "gate-design"
+    ? gateFidelityForSequence(sequence, puzzle.targetOperation ?? puzzle.solution)
+    : stateAccuracy;
+  const accuracy = puzzle.kind === "gate-design" ? gateFidelity : stateAccuracy;
   const gateCount = sequence.length;
 
   const accuracyPoints = Math.round(1000 * accuracy);
@@ -503,6 +549,7 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult
     fidelity: accuracy,
     angularErrorDegrees: Math.max(...caseResults.map((item) => item.angularErrorDegrees)),
     score: Math.max(0, accuracyPoints + solvedBonus + remainingGateBonus - overLimitPenalty),
+    gateFidelity,
     cases: caseResults,
   };
 }
@@ -616,8 +663,76 @@ function phase(angle: number): Complex {
   return c(Math.cos(angle), Math.sin(angle));
 }
 
+function identityMatrix(): Matrix2 {
+  return [[c(1), c(0)], [c(0), c(1)]];
+}
+
+function matrixMultiply(left: Matrix2, right: Matrix2): Matrix2 {
+  return [
+    [
+      cAdd(cMul(left[0][0], right[0][0]), cMul(left[0][1], right[1][0])),
+      cAdd(cMul(left[0][0], right[0][1]), cMul(left[0][1], right[1][1])),
+    ],
+    [
+      cAdd(cMul(left[1][0], right[0][0]), cMul(left[1][1], right[1][0])),
+      cAdd(cMul(left[1][0], right[0][1]), cMul(left[1][1], right[1][1])),
+    ],
+  ];
+}
+
+function matrixDagger(matrix: Matrix2): Matrix2 {
+  return [
+    [cConj(matrix[0][0]), cConj(matrix[1][0])],
+    [cConj(matrix[0][1]), cConj(matrix[1][1])],
+  ];
+}
+
+function matrixTrace(matrix: Matrix2): Complex {
+  return cAdd(matrix[0][0], matrix[1][1]);
+}
+
+function matrixScale(matrix: Matrix2, scalar: Complex): Matrix2 {
+  return [
+    [cMul(scalar, matrix[0][0]), cMul(scalar, matrix[0][1])],
+    [cMul(scalar, matrix[1][0]), cMul(scalar, matrix[1][1])],
+  ];
+}
+
+function matrixDeterminant(matrix: Matrix2): Complex {
+  return cSub(cMul(matrix[0][0], matrix[1][1]), cMul(matrix[0][1], matrix[1][0]));
+}
+
+function unitaryAxisAngle(matrix: Matrix2): { axis: Vec3; angleDegrees: number } {
+  const determinant = matrixDeterminant(matrix);
+  const determinantPhase = Math.atan2(determinant.im, determinant.re);
+  const suMatrix = matrixScale(matrix, phase(-determinantPhase / 2));
+  const cosHalf = clamp(cleanNumber(suMatrix[0][0].re), -1, 1);
+  let angle = 2 * Math.acos(cosHalf);
+  const sinHalf = Math.sin(angle / 2);
+  let axis: Vec3 = [0, 0, 1];
+
+  if (Math.abs(sinHalf) > EPSILON * 1000) {
+    axis = normalize3([
+      cleanNumber(-suMatrix[0][1].im / sinHalf),
+      cleanNumber(-suMatrix[0][1].re / sinHalf),
+      cleanNumber(-suMatrix[0][0].im / sinHalf),
+    ]);
+  }
+
+  if (angle > Math.PI + EPSILON) {
+    angle = 2 * Math.PI - angle;
+    axis = [-axis[0], -axis[1], -axis[2]];
+  }
+
+  return { axis: [cleanNumber(axis[0]), cleanNumber(axis[1]), cleanNumber(axis[2])], angleDegrees: (angle * 180) / Math.PI };
+}
+
 function cAdd(a: Complex, b: Complex): Complex {
   return c(a.re + b.re, a.im + b.im);
+}
+
+function cSub(a: Complex, b: Complex): Complex {
+  return c(a.re - b.re, a.im - b.im);
 }
 
 function cMul(a: Complex, b: Complex): Complex {
@@ -636,8 +751,16 @@ function cAbs2(value: Complex): number {
   return value.re * value.re + value.im * value.im;
 }
 
+function cAbs(value: Complex): number {
+  return Math.sqrt(cAbs2(value));
+}
+
 function clean(value: Complex): Complex {
   return c(Math.abs(value.re) < EPSILON ? 0 : value.re, Math.abs(value.im) < EPSILON ? 0 : value.im);
+}
+
+function cleanNumber(value: number): number {
+  return Math.abs(value) < EPSILON ? 0 : value;
 }
 
 function dot(a: Vec3, b: Vec3): number {

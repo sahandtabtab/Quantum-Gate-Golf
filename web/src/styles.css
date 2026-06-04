@@ -784,6 +784,14 @@ button:disabled {
   font-weight: 800;
 }
 
+.statusPanel .unitarySpecMeta {
+  margin-top: 6px;
+  color: var(--ink);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .readoutPanel {
   left: 24px;
   bottom: 24px;

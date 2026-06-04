@@ -12,6 +12,7 @@ import {
   puzzleCases,
   stateFromBloch,
   sequenceStates,
+  unitarySpecForPuzzle,
 } from "./quantum";
 import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
@@ -177,6 +178,7 @@ export default function App() {
     [activePuzzleCases, displaySequence, showProbeVectors],
   );
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
+  const unitarySpec = useMemo(() => unitarySpecForPuzzle(puzzle), [puzzle]);
   const solved = !isSandbox && resultRevealed && result.fidelity >= 0.999;
   const circuitStartLabel = showProbeVectors ? "probes" : primaryCase.startLabel;
   const circuitEndLabel = puzzleKind === "gate-design" ? "targets" : sandboxProbeMode === "trio" && isSandbox ? "outputs" : "|ψ⟩";
@@ -779,10 +781,9 @@ export default function App() {
           <p className="objectiveMeta">
             {isSandbox
               ? `Free build cap: ${puzzle.gateLimit} gates.`
-              : puzzleKind === "gate-design"
-                ? `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}. Design probes: ${activePuzzleCases.length}.`
-                : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
+              : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
           </p>
+          {unitarySpec ? <p className="unitarySpecMeta">Target unitary: {unitarySpec}</p> : null}
           {puzzle.gateSetLabel ? <p className="gateSetMeta">{puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {puzzle.gateSetLabel}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
@@ -796,12 +797,12 @@ export default function App() {
 
         <section className="floatingPanel readoutPanel" aria-label="Current result">
           <div>
-            <span>{isSandbox ? "Gates" : "Fidelity"}</span>
-            <strong>{isSandbox ? readoutValue(String(displaySequence.length)) : readoutValue(`${(result.fidelity * 100).toFixed(2)}%`)}</strong>
+            <span>{isSandbox ? "Gates" : puzzleKind === "gate-design" ? "Gate fidelity" : "Fidelity"}</span>
+            <strong>{isSandbox ? readoutValue(String(displaySequence.length)) : readoutValue(`${((puzzleKind === "gate-design" ? result.gateFidelity : result.fidelity) * 100).toFixed(2)}%`)}</strong>
           </div>
           <div>
-            <span>{isSandbox ? "Mode" : "Error"}</span>
-            <strong>{isSandbox ? "Free" : readoutValue(`${result.angularErrorDegrees.toFixed(1)} deg`)}</strong>
+            <span>{isSandbox ? "Mode" : puzzleKind === "gate-design" ? "Gates" : "Error"}</span>
+            <strong>{isSandbox ? "Free" : puzzleKind === "gate-design" ? readoutValue(`${displaySequence.length}/${puzzle.gateLimit}`) : readoutValue(`${result.angularErrorDegrees.toFixed(1)} deg`)}</strong>
           </div>
           <div>
             <span>Score</span>
@@ -903,9 +904,9 @@ export default function App() {
         <section className="panelSection details">
           <h3>Readout</h3>
           <dl>
-            {!isSandbox ? (
+            {!isSandbox && puzzleKind !== "gate-design" ? (
               <div>
-                <dt>{puzzleKind === "gate-design" ? "Primary target" : "Target"}</dt>
+                <dt>Target</dt>
                 <dd className="mathReadout">{formatAngles(result.targetBloch)}</dd>
               </div>
             ) : null}
@@ -915,10 +916,12 @@ export default function App() {
                 <dd className="mathReadout">{sandboxProbeMode === "trio" ? "|0⟩, |+x⟩, |+y⟩" : formatAngles(blochVector(sandboxInitialState))}</dd>
               </div>
             ) : null}
-            <div>
-              <dt>Current</dt>
-              <dd className="mathReadout">{resultRevealed ? (sandboxProbeMode === "trio" && isSandbox ? `${result.cases.length} probe outputs` : formatAngles(result.finalBloch)) : isSandbox ? (sandboxProbeMode === "trio" ? "Run circuit to transform all probes." : formatAngles(blochVector(sandboxInitialState))) : "Run circuit to reveal."}</dd>
-            </div>
+            {puzzleKind !== "gate-design" ? (
+              <div>
+                <dt>Current</dt>
+                <dd className="mathReadout">{resultRevealed ? (sandboxProbeMode === "trio" && isSandbox ? `${result.cases.length} probe outputs` : formatAngles(result.finalBloch)) : isSandbox ? (sandboxProbeMode === "trio" ? "Run circuit to transform all probes." : formatAngles(blochVector(sandboxInitialState))) : "Run circuit to reveal."}</dd>
+              </div>
+            ) : null}
             {isSandbox && sandboxProbeMode === "trio" ? (
               <div>
                 <dt>Probe outputs</dt>
@@ -931,13 +934,22 @@ export default function App() {
                   ))}
                 </dd>
               </div>
-            ) : (
+            ) : puzzleKind !== "gate-design" ? (
               <div>
                 <dt>State</dt>
                 <dd>{resultRevealed ? formatState(result.finalState) : isSandbox ? formatState(sandboxInitialState) : "Run circuit to reveal."}</dd>
               </div>
-            )}
+            ) : null}
             {puzzleKind === "gate-design" ? (
+              <>
+              <div>
+                <dt>Target unitary</dt>
+                <dd className="mathReadout">{unitarySpec ?? "No target unitary specified."}</dd>
+              </div>
+              <div>
+                <dt>Gate fidelity</dt>
+                <dd className="mathReadout">{readoutValue(`${(result.gateFidelity * 100).toFixed(2)}%`)}</dd>
+              </div>
               <div>
                 <dt>Probe tests</dt>
                 <dd className="probeCaseList">
@@ -953,6 +965,7 @@ export default function App() {
                   ))}
                 </dd>
               </div>
+              </>
             ) : null}
           </dl>
         </section>
