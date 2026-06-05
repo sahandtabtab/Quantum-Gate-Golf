@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, DragEvent } from "react";
+import type { CSSProperties, DragEvent, ReactNode } from "react";
 import BlochScene from "./BlochScene";
 import {
   PUZZLES,
@@ -17,12 +17,54 @@ import {
 import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
-const ROBUST_GATE_ORDER = ["X90", "Y90", "P120_180", "X180", "Y180", "XM180", "YM180", "XM360"];
+const ROBUST_GATE_ORDER = ["X90", "SK1P360", "SK1M360", "Y90", "P120_180", "X180", "Y180", "XM180", "YM180", "XM360"];
 const DEFAULT_ROBUST_EPSILON = "0.05";
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
 const HINT_COST = 220;
 const AUDIO_VOLUME_MULTIPLIER = 2;
+const SUBSCRIPT_PATTERN = /_\{([^}]+)\}|_([^_\s{}()[\],;]+)/g;
+
+function mathTextParts(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+
+  text.replace(SUBSCRIPT_PATTERN, (match, bracedSubscript: string | undefined, simpleSubscript: string | undefined, offset: number) => {
+    if (offset > lastIndex) {
+      parts.push(text.slice(lastIndex, offset));
+    }
+    parts.push(<sub key={`sub-${offset}`}>{bracedSubscript ?? simpleSubscript}</sub>);
+    lastIndex = offset + match.length;
+    return match;
+  });
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
+function plainMathText(text: string): string {
+  return text.replace(SUBSCRIPT_PATTERN, (_match, bracedSubscript: string | undefined, simpleSubscript: string | undefined) => bracedSubscript ?? simpleSubscript ?? "");
+}
+
+function renderMathLabel(text: string, className = "") {
+  return <span className={["mathLabel", className].filter(Boolean).join(" ")}>{mathTextParts(text)}</span>;
+}
+
+function gateSymbolText(gateName: string): string {
+  return STANDARD_GATES[gateName]?.symbol ?? gateName;
+}
+
+function isPulseGate(gateName: string): boolean {
+  return Boolean(STANDARD_GATES[gateName]?.description.toLowerCase().includes("pulse"));
+}
+
+function renderGateSymbol(gateName: string): ReactNode[] {
+  return mathTextParts(gateSymbolText(gateName));
+}
+
 const DEFAULT_SANDBOX_THETA = "0";
 const DEFAULT_SANDBOX_PHI = "0";
 type SandboxProbeMode = "single" | "trio";
@@ -393,8 +435,6 @@ export default function App() {
     playTone(196, 0.16, 0.016, 0.11, "triangle");
   };
 
-  const gateSymbol = (gateName: string) => STANDARD_GATES[gateName]?.symbol ?? gateName;
-
   const clearRun = (label: string) => {
     setSequence([]);
     setDisplaySequence([]);
@@ -451,7 +491,7 @@ export default function App() {
     }
 
     updateDraftSequence((current) => [...current, gateName]);
-    setAnimationLabel(`Hint added: ${STANDARD_GATES[gateName]?.symbol ?? gateName}`);
+    setAnimationLabel(`Hint added: ${plainMathText(gateSymbolText(gateName))}`);
     return true;
   };
 
@@ -744,7 +784,7 @@ export default function App() {
           ) : (
             sequence.map((gateName, index) => (
               <span
-                className={`circuitGateUnit ${draggedGateIndex === index ? "dragging" : ""}`}
+                className={`circuitGateUnit ${isPulseGate(gateName) ? "pulseGateUnit" : ""} ${draggedGateIndex === index ? "dragging" : ""}`}
                 draggable={!isRunning && sequence.length > 1}
                 key={`${gateName}-${index}`}
                 onDragEnd={() => setDraggedGateIndex(null)}
@@ -762,7 +802,7 @@ export default function App() {
                 >
                   &lt;
                 </button>
-                <span className="circuitGate">{gateSymbol(gateName)}</span>
+                <span className={`circuitGate ${isPulseGate(gateName) ? "pulseGateSymbol" : ""}`}>{renderGateSymbol(gateName)}</span>
                 <button
                   type="button"
                   className="circuitRemove"
@@ -862,8 +902,8 @@ export default function App() {
           <span className={`statusPill ${solved ? "solved" : !isSandbox && resultRevealed ? "failed" : isRunning ? "running" : isSandbox ? "sandbox" : ""}`}>
             {statusText}
           </span>
-          <h1>{puzzle.title}</h1>
-          <p>{puzzle.mission ?? "Choose gates that move the starting state to the target on the Bloch sphere."}</p>
+          <h1>{renderMathLabel(puzzle.title)}</h1>
+          <p>{renderMathLabel(puzzle.mission ?? "Choose gates that move the starting state to the target on the Bloch sphere.")}</p>
           <p className="objectiveMeta">
             {isSandbox
               ? `Free build cap: ${puzzle.gateLimit} gates.`
@@ -880,7 +920,7 @@ export default function App() {
               <span>{unitarySpec}</span>
             </p>
           ) : null}
-          {puzzle.gateSetLabel ? <p className="gateSetMeta">{isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {puzzle.gateSetLabel}</p> : null}
+          {puzzle.gateSetLabel ? <p className="gateSetMeta">{isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {renderMathLabel(puzzle.gateSetLabel)}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
               Next level
@@ -1021,7 +1061,7 @@ export default function App() {
               Replay
             </button>
           </div>
-          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : `${isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: ${puzzle.gateSetLabel ?? "All gates available"}`} - {gateUsageText}</p>
+          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : <>{isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {renderMathLabel(puzzle.gateSetLabel ?? "All gates available")}</>} - {gateUsageText}</p>
           <div className="gateGrid">
             {visibleGateOrder.map((gateName) => (
               <button
@@ -1031,7 +1071,7 @@ export default function App() {
                 onClick={() => addGate(gateName)}
                 disabled={isRunning || gateLimitReached}
               >
-                <span>{gateSymbol(gateName)}</span>
+                <span className={isPulseGate(gateName) ? "pulseGateButtonSymbol" : ""}>{renderGateSymbol(gateName)}</span>
                 <small>{gateLimitReached ? "Gate limit reached" : STANDARD_GATES[gateName].description}</small>
               </button>
             ))}
@@ -1095,7 +1135,7 @@ export default function App() {
                       key={caseResult.label}
                     >
                       <strong>{caseResult.label}</strong>
-                      <em>{caseResult.startLabel} → {caseResult.targetLabel}</em>
+                      <em>{renderMathLabel(`${caseResult.startLabel} \u2192 ${caseResult.targetLabel}`)}</em>
                       <b>{resultRevealed ? `${(caseResult.fidelity * 100).toFixed(1)}%` : "--"}</b>
                     </span>
                   ))}
@@ -1184,15 +1224,15 @@ function LevelSelectScreen({
               key={item.id}
               disabled={locked}
               onClick={() => startPuzzle(item.id)}
-              aria-label={locked ? `${title} level ${index + 1} locked` : `${action} ${title} Level ${index + 1}: ${item.title}`}
+              aria-label={locked ? `${title} level ${index + 1} locked` : `${action} ${title} Level ${index + 1}: ${plainMathText(item.title)}`}
             >
               <div className="levelCardTopline">
                 <span>Level {index + 1}</span>
                 <strong>{locked ? "Locked" : record?.solved ? "Cleared" : "Open"}</strong>
               </div>
-              <h2>{item.title}</h2>
+              <h2>{renderMathLabel(item.title)}</h2>
               <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
-              {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
+              {item.gateSetLabel ? <p className="levelGateSet">{renderMathLabel(item.gateSetLabel)}</p> : null}
               {modeTagForPuzzle(item) ? <p className="levelModeTag">{modeTagForPuzzle(item)}</p> : null}
               <div className="levelCardStats">
                 <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
@@ -1226,7 +1266,7 @@ function LevelSelectScreen({
           <div className="modeSubmenuActions">
             <strong>{modeComplete} / {modePuzzles.length} cleared</strong>
             <button type="button" className="primaryButton" onClick={() => startPuzzle(nextPuzzle.id)}>
-              {modeComplete === modePuzzles.length ? "Review first level" : `Continue: ${nextPuzzle.title}`}
+              {modeComplete === modePuzzles.length ? "Review first level" : <>Continue: {renderMathLabel(nextPuzzle.title)}</>}
             </button>
           </div>
         </section>

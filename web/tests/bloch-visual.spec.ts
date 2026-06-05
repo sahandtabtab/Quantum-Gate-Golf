@@ -1,7 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
-import { PUZZLES, STANDARD_GATES, type Puzzle } from "../src/quantum";
+import { PUZZLES, STANDARD_GATES, evaluatePuzzle, type Puzzle } from "../src/quantum";
 
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
+
+test("robust x90 challenge requires correction pulses", () => {
+  const puzzle = PUZZLES.find((item) => item.id === "robust_sk1_x90");
+  expect(puzzle).toBeTruthy();
+  const robustPuzzle = puzzle!;
+  const threshold = robustPuzzle.successThreshold ?? 0.999;
+
+  expect(evaluatePuzzle(robustPuzzle, ["X90"], 0.05).fidelity).toBeLessThan(threshold);
+  expect(evaluatePuzzle(robustPuzzle, robustPuzzle.solution, 0.05).fidelity).toBeGreaterThanOrEqual(threshold);
+});
 
 test("desktop Bloch scene renders nonblank WebGL pixels", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
@@ -156,15 +166,10 @@ test("robust gate design exposes tunable overrotation and noisy pulses", async (
 
   await expect(page.getByLabel("Robust overrotation error")).toBeVisible();
   await expect(page.getByText("Pulse error: \u03b5 = +0.050")).toBeVisible();
-  await expect(page.getByLabel("Puzzle status").getByText("Composite sequence: (\u03c0/2)_x (\u03c0/2)_y")).toBeVisible();
-  await expect(page.getByRole("button", { name: /R_x\(\u03c0\/2\) pulse/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /R_y\(\u03c0\/2\) pulse/ })).toBeVisible();
+  await expect(page.getByLabel("Puzzle status").getByText("Target (\u03c0/2)x with 2\u03c0 correction pulses")).toBeVisible();
+  await expect(page.getByRole("button", { name: /x-axis \u03c0\/2 pulse/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /2\u03c0 correction at \+97\.2/ })).toBeVisible();
 
-  for (const gateName of ["X90", "Y90"]) {
-    await clickGate(page, gateName);
-  }
-  await page.getByRole("button", { name: "RUN" }).click();
-  await expect(page.getByText("Solved").first()).toBeVisible({ timeout: 7000 });
 });
 
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {

@@ -906,6 +906,28 @@ button:disabled {
   font-weight: 900;
 }
 
+.mathLabel {
+  white-space: normal;
+}
+
+.mathLabel sub {
+  font-size: 0.68em;
+  line-height: 0;
+  margin-left: 0.03em;
+  vertical-align: sub;
+}
+
+.circuitGate.pulseGateSymbol {
+  min-width: 54px;
+  height: 38px;
+  padding: 0 4px;
+  font-size: 0.78rem;
+}
+
+.circuitGate.pulseGateSymbol sub {
+  font-size: 0.62em;
+}
+
 .circuitEmpty {
   position: relative;
   z-index: 1;
@@ -1226,6 +1248,15 @@ select {
   display: block;
   font-size: 1.35rem;
   font-weight: 850;
+}
+
+.gateButton .pulseGateButtonSymbol {
+  font-size: 1.02rem;
+  line-height: 1;
+}
+
+.gateButton .pulseGateButtonSymbol sub {
+  font-size: 0.62em;
 }
 
 .gateButton small {
@@ -1803,6 +1834,11 @@ select {
   cursor: grab;
 }
 
+.circuitGateUnit.pulseGateUnit {
+  flex-basis: 60px;
+  width: 60px;
+}
+
 .circuitGateUnit.dragging {
   opacity: 0.55;
 }
@@ -2178,10 +2214,22 @@ select {
     font-size: 0.82rem;
   }
 
+  .circuitGate.pulseGateSymbol {
+    min-width: 40px;
+    height: 28px;
+    padding: 0 2px;
+    font-size: 0.62rem;
+  }
+
   .circuitGateUnit {
     flex-basis: 31px;
     width: 31px;
     height: 34px;
+  }
+
+  .circuitGateUnit.pulseGateUnit {
+    flex-basis: 44px;
+    width: 44px;
   }
 
   .circuitNudge,
@@ -2529,6 +2577,11 @@ select {
     flex-basis: 28px;
     width: 28px;
     height: 32px;
+  }
+
+  .circuitGateUnit.pulseGateUnit {
+    flex-basis: 42px;
+    width: 42px;
   }
 
   .circuitNudge,
