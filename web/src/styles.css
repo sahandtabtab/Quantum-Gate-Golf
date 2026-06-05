@@ -1442,10 +1442,19 @@ select {
     top: 12px;
     width: 150px;
     height: 150px;
+    background: transparent;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  .mobileMenuGraphic .menuBlochSphere,
+  .mobileMenuGraphic .menuBlochSphere::before,
+  .mobileMenuGraphic .menuBlochSphere::after {
+    background-image: none;
   }
 
   .mobileMenuGraphic .sphereGlow {
-    display: none;
+    display: none !important;
   }
 
   .mobileMenuGraphic .sphereRing {

@@ -25,6 +25,28 @@ test("mobile main menu shows the graphic before the mode cards", async ({ page }
   await expect(mobileGraphic).toBeVisible();
   await expect(lowerGraphic).toBeHidden();
 
+  const spherePaint = await page.locator(".mobileMenuGraphic .menuBlochSphere").evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    const beforeStyle = window.getComputedStyle(element, "::before");
+    const afterStyle = window.getComputedStyle(element, "::after");
+    const glow = element.querySelector(".sphereGlow");
+
+    return {
+      backgroundColor: style.backgroundColor,
+      backgroundImage: style.backgroundImage,
+      beforeBackgroundImage: beforeStyle.backgroundImage,
+      afterBackgroundImage: afterStyle.backgroundImage,
+      boxShadow: style.boxShadow,
+      glowDisplay: glow ? window.getComputedStyle(glow).display : "missing",
+    };
+  });
+  expect(spherePaint.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(spherePaint.backgroundImage).toBe("none");
+  expect(spherePaint.beforeBackgroundImage).toBe("none");
+  expect(spherePaint.afterBackgroundImage).toBe("none");
+  expect(spherePaint.boxShadow).toBe("none");
+  expect(spherePaint.glowDisplay).toBe("none");
+
   const graphicBox = await mobileGraphic.boundingBox();
   const modeBox = await firstMode.boundingBox();
   expect(graphicBox).not.toBeNull();
