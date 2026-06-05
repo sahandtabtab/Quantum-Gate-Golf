@@ -871,7 +871,7 @@ export default function App() {
           </p>
           {isRobust ? (
             <p className="objectiveMeta robustObjectiveMeta">
-              Pulse error: epsilon = {formatEpsilon(activeOverrotationEpsilon)}; pulse angles run at {(1 + activeOverrotationEpsilon).toFixed(3)}x.
+              Pulse error: {"\u03b5"} = {formatEpsilon(activeOverrotationEpsilon)}; pulse angles run at {(1 + activeOverrotationEpsilon).toFixed(3)}x.
             </p>
           ) : null}
           {unitarySpec ? (
@@ -976,7 +976,7 @@ export default function App() {
           <section className="panelSection robustErrorPanel" aria-label="Robust overrotation error">
             <div className="sectionHeader">
               <h3>Pulse error</h3>
-              <span className="sandboxStateKet">epsilon</span>
+              <span className="sandboxStateKet">{"\u03b5"}</span>
             </div>
             <label className="epsilonSlider">
               <span>Fractional overrotation</span>
@@ -992,7 +992,7 @@ export default function App() {
             </label>
             <div className="angleInputGrid compactInputGrid">
               <label>
-                <span>epsilon</span>
+                <span>{"\u03b5"}</span>
                 <input
                   type="number"
                   min="-0.1"
