@@ -156,9 +156,11 @@ test("robust gate design exposes tunable overrotation and noisy pulses", async (
 
   await expect(page.getByLabel("Robust overrotation error")).toBeVisible();
   await expect(page.getByText("Pulse error: epsilon = +0.050")).toBeVisible();
-  await expect(page.getByRole("button", { name: /2pi correction pulse at \+104 deg phase/ })).toBeVisible();
+  await expect(page.getByLabel("Puzzle status").getByText("Table 1 sequence: 90_0 90_90")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Rx\(pi\/2\), Levitt 90_0 pulse/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Ry\(pi\/2\), Levitt 90_90 pulse/ })).toBeVisible();
 
-  for (const gateName of ["X", "P104", "PM104"]) {
+  for (const gateName of ["X90", "Y90"]) {
     await clickGate(page, gateName);
   }
   await page.getByRole("button", { name: "RUN" }).click();

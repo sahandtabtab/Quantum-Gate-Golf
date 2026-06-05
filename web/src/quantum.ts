@@ -39,6 +39,7 @@ export type Puzzle = {
   kind?: "target" | "gate-design" | "sandbox";
   robust?: boolean;
   defaultErrorEpsilon?: number;
+  successThreshold?: number;
   mission?: string;
   cases?: PuzzleCase[];
   targetOperation?: string[];
@@ -65,7 +66,6 @@ export type PuzzleResult = {
 
 const EPSILON = 1e-12;
 const SQRT_HALF = 1 / Math.sqrt(2);
-const SK1_PHASE_DEGREES = (Math.acos(-1 / 4) * 180) / Math.PI;
 
 export const INITIAL_STATE: QubitState = [c(1), c(0)];
 
@@ -89,10 +89,14 @@ export const STANDARD_GATES: Record<string, Gate> = {
   SDG: gate("SDG", "S\u207b\u00b9", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
   T: gate("T", "T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase", [0, 0, 1], Math.PI / 4),
   TDG: gate("TDG", "T\u207b\u00b9", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
-  P104: pulseGate("P104", "P+104", SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at +104 deg phase"),
-  PM104: pulseGate("PM104", "P-104", -SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at -104 deg phase"),
-  P194: pulseGate("P194", "P+194", 90 + SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at +194 deg phase"),
-  PM14: pulseGate("PM14", "P-14", 90 - SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at -14 deg phase"),
+  X90: pulseGate("X90", "90_0", 0, Math.PI / 2, "Rx(pi/2), Levitt 90_0 pulse"),
+  Y90: pulseGate("Y90", "90_90", 90, Math.PI / 2, "Ry(pi/2), Levitt 90_90 pulse"),
+  X180: pulseGate("X180", "180_0", 0, Math.PI, "X = Rx(pi), Levitt 180_0 pulse"),
+  Y180: pulseGate("Y180", "180_90", 90, Math.PI, "Y = Ry(pi), Levitt 180_90 pulse"),
+  P120_180: pulseGate("P120_180", "180_120", 120, Math.PI, "Levitt 180_120 pulse"),
+  XM180: pulseGate("XM180", "180_180", 180, Math.PI, "Rx(-pi), Levitt 180_180 pulse"),
+  YM180: pulseGate("YM180", "180_270", 270, Math.PI, "Ry(-pi), Levitt 180_270 pulse"),
+  XM360: pulseGate("XM360", "360_180", 180, 2 * Math.PI, "2pi pulse about -x, Levitt 360_180"),
 };
 
 const STATE_ZERO = INITIAL_STATE;
@@ -410,67 +414,62 @@ export const PUZZLES: Puzzle[] = [
     cases: operationCases(["Y"], DESIGN_PROBES),
   },
   {
-    id: "robust_inversion_state",
-    title: "Robust inversion",
-    targetState: targetFromSequence(["X"]),
-    gateLimit: 3,
-    solution: ["X", "P104", "PM104"],
-    allowedGates: ["X", "P104", "PM104"],
-    gateSetLabel: "Noisy X pulse + SK1 corrections",
+    id: "robust_levitt_90_pair",
+    title: "Levitt 90 pair",
+    targetState: targetFromStateSequence(STATE_ZERO, ["X90"]),
+    gateLimit: 2,
+    solution: ["X90", "Y90"],
+    allowedGates: ["X90", "Y90", "X180", "Y180"],
+    gateSetLabel: "Table 1 sequence: 90_0 90_90",
     robust: true,
     defaultErrorEpsilon: 0.05,
-    mission: "Reach |1\u27e9 even when every pulse overrotates by epsilon.",
+    successThreshold: 0.998,
+    mission: "Use the Levitt Table 1 two-pulse 90 sequence under pulse-length error.",
   },
   {
-    id: "robust_plus_x_flip",
-    title: "Robust +X flip",
-    targetState: targetFromStateSequence(STATE_PLUS_X, ["Y"]),
-    gateLimit: 3,
-    solution: ["Y", "P194", "PM14"],
-    allowedGates: ["Y", "P194", "PM14"],
-    gateSetLabel: "Noisy Y pulse + phase-shifted corrections",
+    id: "robust_levitt_90_180",
+    title: "Levitt 90-180 transfer",
+    targetState: targetFromStateSequence(STATE_ZERO, ["X90", "P120_180"]),
+    gateLimit: 2,
+    solution: ["X90", "P120_180"],
+    allowedGates: ["X90", "Y90", "X180", "Y180", "P120_180"],
+    gateSetLabel: "Table 1 sequence: 90_0 180_120",
     robust: true,
     defaultErrorEpsilon: 0.05,
-    mission: "Flip |+x\u27e9 to |-x\u27e9 while canceling the leading pulse-length error.",
-    cases: [
-      {
-        label: "Robust transfer",
-        startLabel: "|+x\u27e9",
-        targetLabel: "|-x\u27e9",
-        startState: STATE_PLUS_X,
-        targetState: targetFromStateSequence(STATE_PLUS_X, ["Y"]),
-      },
-    ],
+    successThreshold: 0.999,
+    mission: "Recreate Levitt's 90_0 180_120 composite transfer while the pulses overrotate.",
   },
   {
-    id: "robust_x_gate",
-    title: "Robust X gate",
-    targetState: targetFromStateSequence(STATE_ZERO, ["X"]),
-    gateLimit: 3,
-    solution: ["X", "P104", "PM104"],
-    allowedGates: ["X", "P104", "PM104", "Y"],
-    gateSetLabel: "SK1-style X correction",
+    id: "robust_unitary_90_180",
+    title: "Design Levitt 90-180",
+    targetState: targetFromStateSequence(STATE_ZERO, ["X90", "P120_180"]),
+    gateLimit: 2,
+    solution: ["X90", "P120_180"],
+    allowedGates: ["X90", "Y90", "X180", "Y180", "P120_180"],
+    gateSetLabel: "Table 1 unitary: 90_0 180_120",
     kind: "gate-design",
     robust: true,
     defaultErrorEpsilon: 0.05,
-    mission: "Design an X gate whose first-order overrotation error cancels across all probes.",
-    targetOperation: ["X"],
-    cases: operationCases(["X"], DESIGN_PROBES),
+    successThreshold: 0.997,
+    mission: "Make every probe undergo the same Levitt 90_0 180_120 composite pulse.",
+    targetOperation: ["X90", "P120_180"],
+    cases: operationCases(["X90", "P120_180"], DESIGN_PROBES),
   },
   {
-    id: "robust_y_gate",
-    title: "Robust Y gate",
-    targetState: targetFromStateSequence(STATE_ZERO, ["Y"]),
-    gateLimit: 3,
-    solution: ["Y", "P194", "PM14"],
-    allowedGates: ["Y", "P194", "PM14", "X"],
-    gateSetLabel: "SK1-style Y correction",
+    id: "robust_unitary_canonical_train",
+    title: "Design canonical Levitt train",
+    targetState: targetFromStateSequence(STATE_ZERO, ["X180", "XM360", "YM180", "XM180", "X90"]),
+    gateLimit: 5,
+    solution: ["X180", "XM360", "YM180", "XM180", "X90"],
+    allowedGates: ["X90", "Y90", "X180", "Y180", "XM180", "YM180", "XM360"],
+    gateSetLabel: "Table 1 sequence: 180_0 360_180 180_270 180_180 90_0",
     kind: "gate-design",
     robust: true,
     defaultErrorEpsilon: 0.05,
-    mission: "Design a Y gate that stays accurate under the same fractional pulse error.",
-    targetOperation: ["Y"],
-    cases: operationCases(["Y"], DESIGN_PROBES),
+    successThreshold: 0.99,
+    mission: "Use the canonical-direction Levitt train to make a robust composite unitary.",
+    targetOperation: ["X180", "XM360", "YM180", "XM180", "X90"],
+    cases: operationCases(["X180", "XM360", "YM180", "XM180", "X90"], DESIGN_PROBES),
   },
 ];
 
@@ -615,10 +614,11 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[], overrotationE
     : stateAccuracy;
   const accuracy = puzzle.kind === "gate-design" ? gateFidelity : stateAccuracy;
   const gateCount = sequence.length;
+  const successThreshold = puzzle.successThreshold ?? 0.999;
 
   const accuracyPoints = Math.round(1000 * accuracy);
-  const solvedBonus = accuracy >= 0.999 ? 200 : 0;
-  const remainingGateBonus = accuracy >= 0.999 ? Math.max(0, puzzle.gateLimit - gateCount) * 75 : 0;
+  const solvedBonus = accuracy >= successThreshold ? 200 : 0;
+  const remainingGateBonus = accuracy >= successThreshold ? Math.max(0, puzzle.gateLimit - gateCount) * 75 : 0;
   const overLimitPenalty = Math.max(0, gateCount - puzzle.gateLimit) * 250;
 
   return {

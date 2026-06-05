@@ -17,7 +17,7 @@ import {
 import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
-const ROBUST_GATE_ORDER = ["X", "Y", "P104", "PM104", "P194", "PM14"];
+const ROBUST_GATE_ORDER = ["X90", "Y90", "P120_180", "X180", "Y180", "XM180", "YM180", "XM360"];
 const DEFAULT_ROBUST_EPSILON = "0.05";
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
@@ -139,6 +139,10 @@ function formatEpsilon(value: number): string {
   return sign + value.toFixed(3);
 }
 
+function successThresholdForPuzzle(puzzle: Puzzle): number {
+  return puzzle.successThreshold ?? 0.999;
+}
+
 function isPuzzleUnlocked(puzzleId: string, progress: ProgressState): boolean {
   const selectedPuzzle = PUZZLES.find((item) => item.id === puzzleId);
   if (!selectedPuzzle) {
@@ -217,6 +221,7 @@ export default function App() {
   const robustDefaultEpsilon = puzzle.defaultErrorEpsilon ?? Number(DEFAULT_ROBUST_EPSILON);
   const robustEpsilon = clampNumber(parseDegreeInput(robustEpsilonInput, robustDefaultEpsilon), -0.1, 0.1);
   const activeOverrotationEpsilon = isRobust ? robustEpsilon : 0;
+  const puzzleSuccessThreshold = successThresholdForPuzzle(puzzle);
   const activePuzzleCases = useMemo(() => puzzleCases(puzzle), [puzzle]);
   const primaryCase = activePuzzleCases[0];
   const activePuzzleMode = puzzleModeFor(puzzle);
@@ -243,7 +248,7 @@ export default function App() {
   );
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence, activeOverrotationEpsilon), [activeOverrotationEpsilon, puzzle, displaySequence]);
   const unitarySpec = useMemo(() => unitarySpecForPuzzle(puzzle), [puzzle]);
-  const solved = !isSandbox && resultRevealed && result.fidelity >= 0.999;
+  const solved = !isSandbox && resultRevealed && result.fidelity >= puzzleSuccessThreshold;
   const circuitStartLabel = showProbeVectors ? "probes" : primaryCase.startLabel;
   const circuitEndLabel = puzzleKind === "gate-design" ? "targets" : sandboxProbeMode === "trio" && isSandbox ? "outputs" : "|ψ⟩";
   const statusText = isSandbox
@@ -584,7 +589,7 @@ export default function App() {
       return;
     }
 
-    if (activeRun.result.fidelity < 0.999) {
+    if (activeRun.result.fidelity < successThresholdForPuzzle(activeRun.puzzle)) {
       playLoss();
       return;
     }
@@ -631,7 +636,7 @@ export default function App() {
       puzzle,
       sequence: runSequence,
       result: runResult,
-      completesWholeGame: puzzle.kind !== "sandbox" && runResult.fidelity >= 0.999 && runCompletesWholeGame(progress, puzzle.id),
+      completesWholeGame: puzzle.kind !== "sandbox" && runResult.fidelity >= puzzleSuccessThreshold && runCompletesWholeGame(progress, puzzle.id),
     };
 
     setDisplaySequence(runSequence);
@@ -866,7 +871,7 @@ export default function App() {
           </p>
           {isRobust ? (
             <p className="objectiveMeta robustObjectiveMeta">
-              Pulse error: epsilon = {formatEpsilon(activeOverrotationEpsilon)}; angles run at {(1 + activeOverrotationEpsilon).toFixed(3)}x.
+              Pulse error: epsilon = {formatEpsilon(activeOverrotationEpsilon)}; pulse angles run at {(1 + activeOverrotationEpsilon).toFixed(3)}x.
             </p>
           ) : null}
           {unitarySpec ? (
@@ -1086,7 +1091,7 @@ export default function App() {
                 <dd className="probeCaseList">
                   {result.cases.map((caseResult) => (
                     <span
-                      className={`probeCase ${resultRevealed ? (caseResult.fidelity >= 0.999 ? "pass" : "fail") : ""}`}
+                      className={`probeCase ${resultRevealed ? (caseResult.fidelity >= puzzleSuccessThreshold ? "pass" : "fail") : ""}`}
                       key={caseResult.label}
                     >
                       <strong>{caseResult.label}</strong>
