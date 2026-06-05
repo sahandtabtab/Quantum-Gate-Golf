@@ -79,6 +79,10 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
 }
 
+.mobileMenuGraphic {
+  display: none;
+}
+
 .menuHeroSide {
   display: grid;
   gap: 14px;
@@ -1412,6 +1416,51 @@ select {
     padding: 18px;
   }
 
+  .mainMenuHero {
+    gap: 10px;
+  }
+
+  .mobileMenuGraphic {
+    display: block;
+    margin-top: 16px;
+  }
+
+  .menuHeroSide > .quantumMenuGraphic {
+    display: none;
+  }
+
+  .mobileMenuGraphic .quantumMenuGraphic {
+    min-height: 218px;
+  }
+
+  .mobileMenuGraphic .quantumMenuGraphic::before {
+    inset: 12px;
+    opacity: 0.65;
+  }
+
+  .mobileMenuGraphic .menuBlochSphere {
+    top: 12px;
+    width: 150px;
+    height: 150px;
+  }
+
+  .mobileMenuGraphic .sphereGlow {
+    display: none;
+  }
+
+  .mobileMenuGraphic .sphereRing {
+    width: 122px;
+    height: 122px;
+  }
+
+  .mobileMenuGraphic .sphereAxis {
+    width: 118px;
+  }
+
+  .mobileMenuGraphic .axisZ {
+    height: 126px;
+  }
+
   .quantumMenuGraphic {
     min-height: 260px;
   }
@@ -1443,6 +1492,28 @@ select {
     padding: 10px;
   }
 
+  .mobileMenuGraphic .menuCircuitGraphic {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 9px 8px;
+  }
+
+  .mobileMenuGraphic .miniKet {
+    font-size: 0.82rem;
+  }
+
+  .mobileMenuGraphic .miniWire {
+    min-width: 8px;
+  }
+
+  .mobileMenuGraphic .miniGate {
+    min-width: 27px;
+    height: 27px;
+    border-radius: 7px;
+    font-size: 0.72rem;
+  }
+
   .miniGate {
     min-width: 29px;
     height: 29px;
@@ -1456,6 +1527,33 @@ select {
   .primaryButton {
     width: 100%;
     justify-content: center;
+  }
+
+  .mainMenuModes {
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .mainMenuModes .modeCard {
+    grid-template-rows: auto auto minmax(2.7rem, 1fr) auto;
+    min-height: 140px;
+    padding: 14px;
+  }
+
+  .mainMenuModes .modeCard h2 {
+    margin-top: 10px;
+    font-size: 1.08rem;
+  }
+
+  .mainMenuModes .modeCard p {
+    margin-top: 10px;
+    font-size: 0.92rem;
+    line-height: 1.38;
+  }
+
+  .mainMenuModes .modeCard strong {
+    margin-top: 12px;
+    font-size: 0.82rem;
   }
 
   .levelHeroActions {

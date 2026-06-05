@@ -13,6 +13,26 @@ test("mobile Bloch scene renders nonblank WebGL pixels", async ({ page }) => {
   await openAndCheckScene(page, "mobile");
 });
 
+test("mobile main menu shows the graphic before the mode cards", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  const mobileGraphic = page.locator(".mobileMenuGraphic .quantumMenuGraphic");
+  const lowerGraphic = page.locator(".menuHeroSide > .quantumMenuGraphic");
+  const firstMode = page.getByRole("button", { name: /Start sandbox/ });
+
+  await expect(mobileGraphic).toBeVisible();
+  await expect(lowerGraphic).toBeHidden();
+
+  const graphicBox = await mobileGraphic.boundingBox();
+  const modeBox = await firstMode.boundingBox();
+  expect(graphicBox).not.toBeNull();
+  expect(modeBox).not.toBeNull();
+  expect(graphicBox!.y).toBeLessThan(modeBox!.y);
+  expect(graphicBox!.y).toBeLessThan(320);
+});
+
 test("mobile circuit keeps long sequences compact without horizontal scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

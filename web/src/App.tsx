@@ -1115,6 +1115,9 @@ function LevelSelectScreen({
               View certificate
             </button>
           ) : null}
+          <div className="mobileMenuGraphic" aria-hidden="true">
+            <MenuGraphic />
+          </div>
           <section className="modeCardGrid mainMenuModes" aria-label="Game modes">
             <button type="button" className="modeCard sandboxModeCard" onClick={startSandbox} aria-label="Start sandbox">
               <span>Mode 1</span>
