@@ -37,6 +37,8 @@ export type Puzzle = {
   allowedGates?: string[];
   gateSetLabel?: string;
   kind?: "target" | "gate-design" | "sandbox";
+  robust?: boolean;
+  defaultErrorEpsilon?: number;
   mission?: string;
   cases?: PuzzleCase[];
   targetOperation?: string[];
@@ -63,6 +65,7 @@ export type PuzzleResult = {
 
 const EPSILON = 1e-12;
 const SQRT_HALF = 1 / Math.sqrt(2);
+const SK1_PHASE_DEGREES = (Math.acos(-1 / 4) * 180) / Math.PI;
 
 export const INITIAL_STATE: QubitState = [c(1), c(0)];
 
@@ -86,6 +89,10 @@ export const STANDARD_GATES: Record<string, Gate> = {
   SDG: gate("SDG", "S\u207b\u00b9", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
   T: gate("T", "T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase", [0, 0, 1], Math.PI / 4),
   TDG: gate("TDG", "T\u207b\u00b9", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
+  P104: pulseGate("P104", "P+104", SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at +104 deg phase"),
+  PM104: pulseGate("PM104", "P-104", -SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at -104 deg phase"),
+  P194: pulseGate("P194", "P+194", 90 + SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at +194 deg phase"),
+  PM14: pulseGate("PM14", "P-14", 90 - SK1_PHASE_DEGREES, 2 * Math.PI, "2pi correction pulse at -14 deg phase"),
 };
 
 const STATE_ZERO = INITIAL_STATE;
@@ -402,9 +409,76 @@ export const PUZZLES: Puzzle[] = [
     targetOperation: ["Y"],
     cases: operationCases(["Y"], DESIGN_PROBES),
   },
+  {
+    id: "robust_inversion_state",
+    title: "Robust inversion",
+    targetState: targetFromSequence(["X"]),
+    gateLimit: 3,
+    solution: ["X", "P104", "PM104"],
+    allowedGates: ["X", "P104", "PM104"],
+    gateSetLabel: "Noisy X pulse + SK1 corrections",
+    robust: true,
+    defaultErrorEpsilon: 0.05,
+    mission: "Reach |1\u27e9 even when every pulse overrotates by epsilon.",
+  },
+  {
+    id: "robust_plus_x_flip",
+    title: "Robust +X flip",
+    targetState: targetFromStateSequence(STATE_PLUS_X, ["Y"]),
+    gateLimit: 3,
+    solution: ["Y", "P194", "PM14"],
+    allowedGates: ["Y", "P194", "PM14"],
+    gateSetLabel: "Noisy Y pulse + phase-shifted corrections",
+    robust: true,
+    defaultErrorEpsilon: 0.05,
+    mission: "Flip |+x\u27e9 to |-x\u27e9 while canceling the leading pulse-length error.",
+    cases: [
+      {
+        label: "Robust transfer",
+        startLabel: "|+x\u27e9",
+        targetLabel: "|-x\u27e9",
+        startState: STATE_PLUS_X,
+        targetState: targetFromStateSequence(STATE_PLUS_X, ["Y"]),
+      },
+    ],
+  },
+  {
+    id: "robust_x_gate",
+    title: "Robust X gate",
+    targetState: targetFromStateSequence(STATE_ZERO, ["X"]),
+    gateLimit: 3,
+    solution: ["X", "P104", "PM104"],
+    allowedGates: ["X", "P104", "PM104", "Y"],
+    gateSetLabel: "SK1-style X correction",
+    kind: "gate-design",
+    robust: true,
+    defaultErrorEpsilon: 0.05,
+    mission: "Design an X gate whose first-order overrotation error cancels across all probes.",
+    targetOperation: ["X"],
+    cases: operationCases(["X"], DESIGN_PROBES),
+  },
+  {
+    id: "robust_y_gate",
+    title: "Robust Y gate",
+    targetState: targetFromStateSequence(STATE_ZERO, ["Y"]),
+    gateLimit: 3,
+    solution: ["Y", "P194", "PM14"],
+    allowedGates: ["Y", "P194", "PM14", "X"],
+    gateSetLabel: "SK1-style Y correction",
+    kind: "gate-design",
+    robust: true,
+    defaultErrorEpsilon: 0.05,
+    mission: "Design a Y gate that stays accurate under the same fractional pulse error.",
+    targetOperation: ["Y"],
+    cases: operationCases(["Y"], DESIGN_PROBES),
+  },
 ];
 
-export function sequenceStates(sequence: string[], initialState: QubitState = INITIAL_STATE): QubitState[] {
+export function sequenceStates(
+  sequence: string[],
+  initialState: QubitState = INITIAL_STATE,
+  overrotationEpsilon = 0,
+): QubitState[] {
   let state = normalize(initialState);
   const states = [state];
 
@@ -413,7 +487,7 @@ export function sequenceStates(sequence: string[], initialState: QubitState = IN
     if (!selectedGate) {
       throw new Error(`Unknown gate: ${gateName}`);
     }
-    state = applyGate(state, selectedGate);
+    state = applyGate(state, selectedGate, overrotationEpsilon);
     states.push(state);
   }
 
@@ -436,9 +510,9 @@ export function puzzleCases(puzzle: Puzzle): PuzzleCase[] {
   ];
 }
 
-export function applyGate(state: QubitState, selectedGate: Gate): QubitState {
+export function applyGate(state: QubitState, selectedGate: Gate, overrotationEpsilon = 0): QubitState {
   const [a, b] = state;
-  const [[m00, m01], [m10, m11]] = selectedGate.matrix;
+  const [[m00, m01], [m10, m11]] = matrixForGate(selectedGate, overrotationEpsilon);
   return normalize([
     clean(cAdd(cMul(m00, a), cMul(m01, b))),
     clean(cAdd(cMul(m10, a), cMul(m11, b))),
@@ -469,7 +543,7 @@ function targetFromStateSequence(initialState: QubitState, sequence: string[]): 
   return states[states.length - 1] ?? initialState;
 }
 
-export function sequenceMatrix(sequence: string[]): Matrix2 {
+export function sequenceMatrix(sequence: string[], overrotationEpsilon = 0): Matrix2 {
   let matrix = identityMatrix();
 
   for (const gateName of sequence) {
@@ -477,14 +551,18 @@ export function sequenceMatrix(sequence: string[]): Matrix2 {
     if (!selectedGate) {
       throw new Error(`Unknown gate: ${gateName}`);
     }
-    matrix = matrixMultiply(selectedGate.matrix, matrix);
+    matrix = matrixMultiply(matrixForGate(selectedGate, overrotationEpsilon), matrix);
   }
 
   return matrix;
 }
 
-export function gateFidelityForSequence(sequence: string[], targetOperation: string[] = []): number {
-  const implemented = sequenceMatrix(sequence);
+export function gateFidelityForSequence(
+  sequence: string[],
+  targetOperation: string[] = [],
+  overrotationEpsilon = 0,
+): number {
+  const implemented = sequenceMatrix(sequence, overrotationEpsilon);
   const target = sequenceMatrix(targetOperation);
   const overlap = matrixTrace(matrixMultiply(matrixDagger(target), implemented));
   return clamp(cAbs(overlap) / 2, 0, 1);
@@ -527,12 +605,13 @@ export function angularErrorDegrees(state: QubitState, target: QubitState): numb
   return (Math.acos(dotProduct) * 180) / Math.PI;
 }
 
-export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult {
-  const caseResults = puzzleCases(puzzle).map((puzzleCase) => evaluatePuzzleCase(puzzleCase, sequence));
+export function evaluatePuzzle(puzzle: Puzzle, sequence: string[], overrotationEpsilon = 0): PuzzleResult {
+  const effectiveOverrotation = puzzle.robust ? overrotationEpsilon : 0;
+  const caseResults = puzzleCases(puzzle).map((puzzleCase) => evaluatePuzzleCase(puzzleCase, sequence, effectiveOverrotation));
   const primaryCase = caseResults[0];
   const stateAccuracy = Math.min(...caseResults.map((item) => item.fidelity));
   const gateFidelity = puzzle.kind === "gate-design"
-    ? gateFidelityForSequence(sequence, puzzle.targetOperation ?? puzzle.solution)
+    ? gateFidelityForSequence(sequence, puzzle.targetOperation ?? puzzle.solution, effectiveOverrotation)
     : stateAccuracy;
   const accuracy = puzzle.kind === "gate-design" ? gateFidelity : stateAccuracy;
   const gateCount = sequence.length;
@@ -554,8 +633,8 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[]): PuzzleResult
   };
 }
 
-function evaluatePuzzleCase(puzzleCase: PuzzleCase, sequence: string[]): PuzzleCaseResult {
-  const states = sequenceStates(sequence, puzzleCase.startState);
+function evaluatePuzzleCase(puzzleCase: PuzzleCase, sequence: string[], overrotationEpsilon = 0): PuzzleCaseResult {
+  const states = sequenceStates(sequence, puzzleCase.startState, overrotationEpsilon);
   const finalState = states[states.length - 1];
   return {
     ...puzzleCase,
@@ -657,6 +736,34 @@ function c(re: number, im = 0): Complex {
 
 function gate(name: string, symbol: string, matrix: Matrix2, description: string, axis: Vec3, angle: number): Gate {
   return { name, symbol, matrix, description, rotation: { axis: normalize3(axis), angle } };
+}
+
+function pulseGate(name: string, symbol: string, phaseDegrees: number, angle: number, description: string): Gate {
+  const axis = axisFromPhaseDegrees(phaseDegrees);
+  return gate(name, symbol, rotationMatrix(axis, angle), description, axis, angle);
+}
+
+function matrixForGate(selectedGate: Gate, overrotationEpsilon: number): Matrix2 {
+  if (Math.abs(overrotationEpsilon) < EPSILON) {
+    return selectedGate.matrix;
+  }
+
+  return rotationMatrix(selectedGate.rotation.axis, selectedGate.rotation.angle * (1 + overrotationEpsilon));
+}
+
+function rotationMatrix(axis: Vec3, angle: number): Matrix2 {
+  const [x, y, z] = normalize3(axis);
+  const cosHalf = Math.cos(angle / 2);
+  const sinHalf = Math.sin(angle / 2);
+  return [
+    [c(cosHalf, -sinHalf * z), c(-sinHalf * y, -sinHalf * x)],
+    [c(sinHalf * y, -sinHalf * x), c(cosHalf, sinHalf * z)],
+  ];
+}
+
+function axisFromPhaseDegrees(phaseDegrees: number): Vec3 {
+  const phaseRadians = (phaseDegrees * Math.PI) / 180;
+  return [Math.cos(phaseRadians), Math.sin(phaseRadians), 0];
 }
 
 function phase(angle: number): Complex {

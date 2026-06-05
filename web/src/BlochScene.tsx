@@ -7,6 +7,7 @@ type BlochSceneProps = {
   keyVectors: Vec3[];
   probeKeyVectors?: Vec3[][];
   gateSequence: string[];
+  gateErrorEpsilon?: number;
   targetVector: Vec3 | null;
   animationMode: "to-final" | "replay";
   showTrajectory: boolean;
@@ -60,6 +61,7 @@ export default function BlochScene({
   keyVectors,
   probeKeyVectors,
   gateSequence,
+  gateErrorEpsilon = 0,
   targetVector,
   animationMode,
   showTrajectory,
@@ -71,7 +73,7 @@ export default function BlochScene({
 }: BlochSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const probeRuntimesRef = useRef<ProbeRuntime[]>(
-    createProbeRuntimes(activeProbeSets(keyVectors, probeKeyVectors), [], animationMode, gateSequence),
+    createProbeRuntimes(activeProbeSets(keyVectors, probeKeyVectors), [], animationMode, gateSequence, gateErrorEpsilon),
   );
   const targetVectorRef = useRef<Vec3 | null>(targetVector);
   const solvedRef = useRef(solved);
@@ -79,6 +81,7 @@ export default function BlochScene({
   const animationModeRef = useRef(animationMode);
   const showTrajectoryRef = useRef(showTrajectory);
   const gateSequenceRef = useRef(gateSequence);
+  const gateErrorEpsilonRef = useRef(gateErrorEpsilon);
   const onAnimationNearEndRef = useRef(onAnimationNearEnd);
   const onAnimationCompleteRef = useRef(onAnimationComplete);
   const replayNonceRef = useRef(replayNonce);
@@ -108,12 +111,14 @@ export default function BlochScene({
     animationModeRef.current = animationMode;
     showTrajectoryRef.current = showTrajectory;
     gateSequenceRef.current = gateSequence;
+    gateErrorEpsilonRef.current = gateErrorEpsilon;
     replayNonceRef.current = replayNonce;
     probeRuntimesRef.current = createProbeRuntimes(
       probeSets,
       probeRuntimesRef.current,
       animationMode,
       gateSequence,
+      gateErrorEpsilon,
     );
     const primaryPath = probeRuntimesRef.current[0]?.animationPath ?? [NORTH_POLE];
     const gateCount = animationMode === "replay" && gateSequence.length > 0
@@ -127,7 +132,7 @@ export default function BlochScene({
     nearEndNotifiedRef.current = false;
     completionNotifiedRef.current = false;
     updateTarget();
-  }, [animationMode, gateSequence, keyVectors, probeKeyVectors, replayNonce, showTrajectory, targetVector]);
+  }, [animationMode, gateErrorEpsilon, gateSequence, keyVectors, probeKeyVectors, replayNonce, showTrajectory, targetVector]);
 
   useEffect(() => {
     if (celebrationNonce > 0) {
@@ -284,6 +289,7 @@ export default function BlochScene({
         progress,
         animationModeRef.current,
         gateSequenceRef.current,
+        gateErrorEpsilonRef.current,
         runtime.trailKeyVectors[0] ?? NORTH_POLE,
       );
       runtime.displayedVector = current;
@@ -297,6 +303,7 @@ export default function BlochScene({
           progress,
           animationModeRef.current,
           gateSequenceRef.current,
+          gateErrorEpsilonRef.current,
         );
         trailMesh.geometry = createTrailGeometry(trailPoints.map(toDisplayVector3));
       } else {
@@ -345,6 +352,7 @@ function createProbeRuntimes(
   previousRuntimes: ProbeRuntime[],
   mode: "to-final" | "replay",
   gateSequence: string[],
+  gateErrorEpsilon: number,
 ): ProbeRuntime[] {
   return probeSets.map((keyVectorSet, index) => {
     const keyVectors = safeKeyVectorSet(keyVectorSet);
@@ -352,7 +360,7 @@ function createProbeRuntimes(
     return {
       keyVectors,
       trailKeyVectors: keyVectors,
-      animationPath: nextAnimationPath(keyVectors, previousDisplayed, mode, gateSequence),
+      animationPath: nextAnimationPath(keyVectors, previousDisplayed, mode, gateSequence, gateErrorEpsilon),
       displayedVector: previousDisplayed,
     };
   });
@@ -552,21 +560,22 @@ function nextAnimationPath(
   displayedVector: Vec3,
   mode: "to-final" | "replay",
   gateSequence: string[],
+  gateErrorEpsilon: number,
 ): Vec3[] {
   if (mode === "replay" && gateSequence.length > 0) {
-    return buildGateRotationPath(keyVectors[0] ?? NORTH_POLE, gateSequence);
+    return buildGateRotationPath(keyVectors[0] ?? NORTH_POLE, gateSequence, gateErrorEpsilon);
   }
 
   const finalVector = keyVectors[keyVectors.length - 1] ?? displayedVector;
   return [safeVector(displayedVector), safeVector(finalVector)];
 }
 
-function buildGateRotationPath(startVector: Vec3, gateSequence: string[]): Vec3[] {
+function buildGateRotationPath(startVector: Vec3, gateSequence: string[], gateErrorEpsilon: number): Vec3[] {
   const path = [safeVector(startVector)];
   let current = safeVector(startVector);
 
   for (const gateName of gateSequence) {
-    const rotation = gateRotation(gateName);
+    const rotation = gateRotationWithError(gateName, gateErrorEpsilon);
     const gateStart = current;
     for (let sample = 1; sample <= GATE_TRAJECTORY_SAMPLES; sample += 1) {
       path.push(rotateBlochVector(gateStart, rotation, sample / GATE_TRAJECTORY_SAMPLES));
@@ -582,36 +591,37 @@ function currentAnimatedVector(
   progress: number,
   mode: "to-final" | "replay",
   gateSequence: string[],
+  gateErrorEpsilon: number,
   startVector: Vec3,
 ): Vec3 {
   if (mode === "replay" && gateSequence.length > 0) {
-    return currentGateRotationVector(startVector, gateSequence, progress);
+    return currentGateRotationVector(startVector, gateSequence, gateErrorEpsilon, progress);
   }
 
   return currentVector(path, progress);
 }
 
-function currentGateRotationVector(startVector: Vec3, gateSequence: string[], progress: number): Vec3 {
+function currentGateRotationVector(startVector: Vec3, gateSequence: string[], gateErrorEpsilon: number, progress: number): Vec3 {
   let current = safeVector(startVector);
   const scaledProgress = clamp01(progress) * gateSequence.length;
   const activeGateIndex = Math.min(gateSequence.length - 1, Math.floor(scaledProgress));
   const localProgress = smoothstep(scaledProgress - activeGateIndex);
 
   for (let index = 0; index < activeGateIndex; index += 1) {
-    current = rotateBlochVector(current, gateRotation(gateSequence[index]), 1);
+    current = rotateBlochVector(current, gateRotationWithError(gateSequence[index], gateErrorEpsilon), 1);
   }
 
-  return rotateBlochVector(current, gateRotation(gateSequence[activeGateIndex]), localProgress);
+  return rotateBlochVector(current, gateRotationWithError(gateSequence[activeGateIndex], gateErrorEpsilon), localProgress);
 }
 
-function buildGateRotationTrail(startVector: Vec3, gateSequence: string[], progress: number): Vec3[] {
+function buildGateRotationTrail(startVector: Vec3, gateSequence: string[], gateErrorEpsilon: number, progress: number): Vec3[] {
   const points = [safeVector(startVector)];
   const scaledProgress = clamp01(progress) * gateSequence.length;
   const activeGateIndex = Math.min(gateSequence.length - 1, Math.floor(scaledProgress));
   let current = safeVector(startVector);
 
   for (let index = 0; index <= activeGateIndex; index += 1) {
-    const rotation = gateRotation(gateSequence[index]);
+    const rotation = gateRotationWithError(gateSequence[index], gateErrorEpsilon);
     const gateStart = current;
     const endAmount = index === activeGateIndex ? scaledProgress - activeGateIndex : 1;
     const samples = Math.max(2, Math.ceil(GATE_TRAJECTORY_SAMPLES * Math.max(endAmount, 0.05)));
@@ -633,9 +643,10 @@ function buildDisplayedTrail(
   progress: number,
   mode: "to-final" | "replay",
   gateSequence: string[],
+  gateErrorEpsilon: number,
 ): Vec3[] {
   if (mode === "replay" && gateSequence.length > 0) {
-    return buildGateRotationTrail(keyVectors[0] ?? NORTH_POLE, gateSequence, progress);
+    return buildGateRotationTrail(keyVectors[0] ?? NORTH_POLE, gateSequence, gateErrorEpsilon, progress);
   }
 
   if (mode === "replay") {
@@ -705,6 +716,11 @@ function buildTrail(path: Vec3[], progress: number): Vec3[] {
   }
 
   return points;
+}
+
+function gateRotationWithError(gateName: string, gateErrorEpsilon: number) {
+  const rotation = gateRotation(gateName);
+  return { ...rotation, angle: rotation.angle * (1 + gateErrorEpsilon) };
 }
 
 function clamp01(value: number): number {

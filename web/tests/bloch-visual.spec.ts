@@ -20,7 +20,7 @@ test("mobile main menu shows the graphic before the mode cards", async ({ page }
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
   const mobileGraphic = page.locator(".mobileMenuGraphic .quantumMenuGraphic");
   const lowerGraphic = page.locator(".menuHeroSide > .quantumMenuGraphic");
-  const firstMode = page.getByRole("button", { name: /Start sandbox/ });
+  const firstMode = page.getByRole("button", { name: /Open State-to-state transfer levels/ });
 
   await expect(mobileGraphic).toBeVisible();
   await expect(lowerGraphic).toBeHidden();
@@ -145,6 +145,26 @@ test("unitary design readout uses unitary metrics instead of state metrics", asy
   await expect(details.getByText(/^State$/)).not.toBeVisible();
 });
 
+test("robust gate design exposes tunable overrotation and noisy pulses", async ({ page }) => {
+  test.setTimeout(45000);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Open Robust gate design levels/ }).click();
+  await page.getByRole("button", { name: /Start Robust gate design Level 1/ }).click();
+
+  await expect(page.getByLabel("Robust overrotation error")).toBeVisible();
+  await expect(page.getByText("Pulse error: epsilon = +0.050")).toBeVisible();
+  await expect(page.getByRole("button", { name: /2pi correction pulse at \+104 deg phase/ })).toBeVisible();
+
+  for (const gateName of ["X", "P104", "PM104"]) {
+    await clickGate(page, gateName);
+  }
+  await page.getByRole("button", { name: "RUN" }).click();
+  await expect(page.getByText("Solved").first()).toBeVisible({ timeout: 7000 });
+});
+
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
   await startFirstLevel(page);
@@ -196,11 +216,12 @@ test("solving the final level opens the certificate screen", async ({ page }) =>
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
-  const designPuzzles = PUZZLES.filter((item) => item.kind === "gate-design");
   const finalPuzzle = PUZZLES[PUZZLES.length - 1];
-  const finalDesignLevel = designPuzzles.length;
-  await page.getByRole("button", { name: /Open Unitary design levels/ }).click();
-  await page.getByRole("button", { name: new RegExp(`Start Unitary design Level ${finalDesignLevel}: ${escapeRegex(finalPuzzle.title)}`) }).click();
+  const robustPuzzles = PUZZLES.filter((item) => item.robust);
+  const finalRobustLevel = robustPuzzles.length;
+  const finalLevelLabel = new RegExp("Start Robust gate design Level " + finalRobustLevel + ": " + escapeRegex(finalPuzzle.title));
+  await page.getByRole("button", { name: /Open Robust gate design levels/ }).click();
+  await page.getByRole("button", { name: finalLevelLabel }).click();
   for (const gateName of finalPuzzle.solution) {
     await clickGate(page, gateName);
   }

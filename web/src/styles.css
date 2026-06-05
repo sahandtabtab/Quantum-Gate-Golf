@@ -189,6 +189,10 @@ button:disabled {
   margin-top: 0;
 }
 
+.mainMenuActions {
+  align-items: center;
+}
+
 .quantumMenuGraphic {
   position: relative;
   min-height: 318px;
@@ -1005,8 +1009,40 @@ select {
   color: var(--ink);
 }
 
-.sandboxStatePanel {
+.sandboxStatePanel,
+.robustErrorPanel {
   margin-top: 18px;
+}
+
+.robustObjectiveMeta {
+  color: var(--cyan-dark);
+}
+
+.epsilonSlider {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.epsilonSlider span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.epsilonSlider input[type="range"] {
+  width: 100%;
+  accent-color: var(--cyan);
+}
+
+.compactInputGrid {
+  margin-top: 10px;
+}
+
+.compactInputGrid input[readonly] {
+  color: var(--cyan-dark);
 }
 
 .sandboxStateKet {

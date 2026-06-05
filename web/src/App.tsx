@@ -17,6 +17,8 @@ import {
 import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
+const ROBUST_GATE_ORDER = ["X", "Y", "P104", "PM104", "P194", "PM14"];
+const DEFAULT_ROBUST_EPSILON = "0.05";
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
 const HINT_COST = 220;
@@ -59,9 +61,13 @@ type ActiveRun = {
   completesWholeGame: boolean;
 };
 
-type PuzzleMode = "state-transfer" | "unitary-design";
+type PuzzleMode = "state-transfer" | "unitary-design" | "robust-gate-design";
 
 function puzzleModeFor(puzzle: Puzzle): PuzzleMode {
+  if (puzzle.robust) {
+    return "robust-gate-design";
+  }
+
   return puzzle.kind === "gate-design" ? "unitary-design" : "state-transfer";
 }
 
@@ -82,6 +88,55 @@ function unlockedIndexForMode(mode: PuzzleMode, progress: ProgressState): number
 function nextPuzzleForMode(mode: PuzzleMode, progress: ProgressState): Puzzle {
   const modePuzzles = puzzlesForMode(mode);
   return modePuzzles.find((item) => !progress[item.id]?.solved) ?? modePuzzles[0];
+}
+
+function modeTitle(mode: PuzzleMode): string {
+  if (mode === "state-transfer") {
+    return "State-to-state transfer";
+  }
+
+  if (mode === "unitary-design") {
+    return "Unitary design";
+  }
+
+  return "Robust gate design";
+}
+
+function modeCopy(mode: PuzzleMode): string {
+  if (mode === "state-transfer") {
+    return "Move |0\u27e9 to a specific target state using the given gates.";
+  }
+
+  if (mode === "unitary-design") {
+    return "Engineer a target unitary using the given gates.";
+  }
+
+  return "Build circuits that stay accurate when every available pulse overrotates.";
+}
+
+function modeEyebrow(mode: PuzzleMode): string {
+  if (mode === "state-transfer") {
+    return "State mode";
+  }
+
+  if (mode === "unitary-design") {
+    return "Design mode";
+  }
+
+  return "Robust mode";
+}
+
+function modeTagForPuzzle(puzzle: Puzzle): string | null {
+  if (puzzle.robust) {
+    return puzzle.kind === "gate-design" ? "Robust unitary" : "Robust transfer";
+  }
+
+  return puzzle.kind === "gate-design" ? "Gate design" : null;
+}
+
+function formatEpsilon(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return sign + value.toFixed(3);
 }
 
 function isPuzzleUnlocked(puzzleId: string, progress: ProgressState): boolean {
@@ -121,6 +176,7 @@ export default function App() {
   const [sandboxThetaDegrees, setSandboxThetaDegrees] = useState(DEFAULT_SANDBOX_THETA);
   const [sandboxProbeMode, setSandboxProbeMode] = useState<SandboxProbeMode>("single");
   const [sandboxPhiDegrees, setSandboxPhiDegrees] = useState(DEFAULT_SANDBOX_PHI);
+  const [robustEpsilonInput, setRobustEpsilonInput] = useState(DEFAULT_ROBUST_EPSILON);
   const revealedRunKeyRef = useRef("");
   const activeRunRef = useRef<ActiveRun | null>(null);
   const activeEntryKeyRef = useRef("");
@@ -157,27 +213,35 @@ export default function App() {
   }), [sandboxCases, sandboxInitialState]);
   const puzzle = isSandbox ? sandboxPuzzle : PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
   const puzzleKind = puzzle.kind ?? "target";
+  const isRobust = Boolean(puzzle.robust);
+  const robustDefaultEpsilon = puzzle.defaultErrorEpsilon ?? Number(DEFAULT_ROBUST_EPSILON);
+  const robustEpsilon = clampNumber(parseDegreeInput(robustEpsilonInput, robustDefaultEpsilon), -0.1, 0.1);
+  const activeOverrotationEpsilon = isRobust ? robustEpsilon : 0;
   const activePuzzleCases = useMemo(() => puzzleCases(puzzle), [puzzle]);
   const primaryCase = activePuzzleCases[0];
   const activePuzzleMode = puzzleModeFor(puzzle);
   const activeModePuzzles = isSandbox ? [] : puzzlesForMode(activePuzzleMode);
   const puzzleIndex = Math.max(0, activeModePuzzles.findIndex((item) => item.id === puzzle.id));
-  const allowedGateSet = useMemo(() => new Set(puzzle.allowedGates ?? GATE_ORDER), [puzzle]);
+  const allowedGateSet = useMemo(() => new Set(puzzle.allowedGates ?? (isRobust ? ROBUST_GATE_ORDER : GATE_ORDER)), [isRobust, puzzle]);
   const gateLimitReached = sequence.length >= puzzle.gateLimit;
   const gateUsageText = isSandbox
     ? `${sequence.length}/${puzzle.gateLimit} sandbox gates`
     : `${sequence.length}/${puzzle.gateLimit} gates used`;
-  const visibleGateOrder = GATE_ORDER.filter((gateName) => allowedGateSet.has(gateName));
-  const states = useMemo(() => sequenceStates(displaySequence, primaryCase.startState), [displaySequence, primaryCase]);
+  const activeGateOrder = isRobust ? ROBUST_GATE_ORDER : GATE_ORDER;
+  const visibleGateOrder = activeGateOrder.filter((gateName) => allowedGateSet.has(gateName));
+  const states = useMemo(
+    () => sequenceStates(displaySequence, primaryCase.startState, activeOverrotationEpsilon),
+    [activeOverrotationEpsilon, displaySequence, primaryCase],
+  );
   const keyVectors = useMemo(() => states.map(blochVector), [states]);
   const showProbeVectors = puzzleKind === "gate-design" || (isSandbox && sandboxProbeMode === "trio");
   const probeKeyVectors = useMemo(
     () => showProbeVectors
-      ? activePuzzleCases.map((puzzleCase) => sequenceStates(displaySequence, puzzleCase.startState).map(blochVector))
+      ? activePuzzleCases.map((puzzleCase) => sequenceStates(displaySequence, puzzleCase.startState, activeOverrotationEpsilon).map(blochVector))
       : undefined,
-    [activePuzzleCases, displaySequence, showProbeVectors],
+    [activeOverrotationEpsilon, activePuzzleCases, displaySequence, showProbeVectors],
   );
-  const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence), [puzzle, displaySequence]);
+  const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence, activeOverrotationEpsilon), [activeOverrotationEpsilon, puzzle, displaySequence]);
   const unitarySpec = useMemo(() => unitarySpecForPuzzle(puzzle), [puzzle]);
   const solved = !isSandbox && resultRevealed && result.fidelity >= 0.999;
   const circuitStartLabel = showProbeVectors ? "probes" : primaryCase.startLabel;
@@ -210,6 +274,14 @@ export default function App() {
   useEffect(() => {
     saveProgress(progress);
   }, [progress]);
+
+  useEffect(() => {
+    if (!puzzle.robust) {
+      return;
+    }
+
+    setRobustEpsilonInput((puzzle.defaultErrorEpsilon ?? Number(DEFAULT_ROBUST_EPSILON)).toFixed(3));
+  }, [puzzle.defaultErrorEpsilon, puzzle.id, puzzle.robust]);
 
   useEffect(() => {
     if (view !== "play" && view !== "sandbox") {
@@ -551,7 +623,7 @@ export default function App() {
 
     playClick();
     const runSequence = [...sequence];
-    const runResult = evaluatePuzzle(puzzle, runSequence);
+    const runResult = evaluatePuzzle(puzzle, runSequence, activeOverrotationEpsilon);
     const token = runTokenRef.current + 1;
     runTokenRef.current = token;
     activeRunRef.current = {
@@ -586,7 +658,7 @@ export default function App() {
       token,
       puzzle,
       sequence: replaySequence,
-      result: evaluatePuzzle(puzzle, replaySequence),
+      result: evaluatePuzzle(puzzle, replaySequence, activeOverrotationEpsilon),
       completesWholeGame: false,
     };
 
@@ -633,6 +705,14 @@ export default function App() {
 
     playClick();
     setSandboxProbeMode(mode);
+  };
+
+  const setRobustEpsilonValue = (value: string) => {
+    if (isRunning) {
+      return;
+    }
+
+    setRobustEpsilonInput(value);
   };
 
   const renderCircuitPanel = (className: string) => (
@@ -741,6 +821,7 @@ export default function App() {
         <BlochScene
           keyVectors={keyVectors}
           gateSequence={displaySequence}
+          gateErrorEpsilon={activeOverrotationEpsilon}
           targetVector={isSandbox || puzzleKind === "gate-design" ? null : result.targetBloch}
           probeKeyVectors={probeKeyVectors}
           animationMode={animationMode}
@@ -783,13 +864,18 @@ export default function App() {
               ? `Free build cap: ${puzzle.gateLimit} gates.`
               : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
           </p>
+          {isRobust ? (
+            <p className="objectiveMeta robustObjectiveMeta">
+              Pulse error: epsilon = {formatEpsilon(activeOverrotationEpsilon)}; angles run at {(1 + activeOverrotationEpsilon).toFixed(3)}x.
+            </p>
+          ) : null}
           {unitarySpec ? (
             <p className="unitarySpecMeta">
               <strong>Target unitary:</strong>
               <span>{unitarySpec}</span>
             </p>
           ) : null}
-          {puzzle.gateSetLabel ? <p className="gateSetMeta">{puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {puzzle.gateSetLabel}</p> : null}
+          {puzzle.gateSetLabel ? <p className="gateSetMeta">{isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {puzzle.gateSetLabel}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
               Next level
@@ -822,7 +908,7 @@ export default function App() {
           <button type="button" className="menuButton" onClick={() => { playClick(); setView("levels"); }}>
             Main menu
           </button>
-          <h2>{isSandbox ? "Sandbox controls" : "Gate controls"}</h2>
+          <h2>{isSandbox ? "Sandbox controls" : isRobust ? "Robust controls" : "Gate controls"}</h2>
           <div className="panelLevelMeta">
             <span>{isSandbox ? "Free play" : `Level ${puzzleIndex + 1} of ${activeModePuzzles.length}`}</span>
           </div>
@@ -881,6 +967,46 @@ export default function App() {
           </section>
         ) : null}
 
+        {isRobust ? (
+          <section className="panelSection robustErrorPanel" aria-label="Robust overrotation error">
+            <div className="sectionHeader">
+              <h3>Pulse error</h3>
+              <span className="sandboxStateKet">epsilon</span>
+            </div>
+            <label className="epsilonSlider">
+              <span>Fractional overrotation</span>
+              <input
+                type="range"
+                min="-0.1"
+                max="0.1"
+                step="0.005"
+                value={robustEpsilon.toFixed(3)}
+                onChange={(event) => setRobustEpsilonValue(event.target.value)}
+                disabled={isRunning}
+              />
+            </label>
+            <div className="angleInputGrid compactInputGrid">
+              <label>
+                <span>epsilon</span>
+                <input
+                  type="number"
+                  min="-0.1"
+                  max="0.1"
+                  step="0.005"
+                  value={robustEpsilonInput}
+                  onChange={(event) => setRobustEpsilonValue(event.target.value)}
+                  disabled={isRunning}
+                />
+              </label>
+              <label>
+                <span>scale</span>
+                <input type="text" value={(1 + activeOverrotationEpsilon).toFixed(3) + "x"} readOnly />
+              </label>
+            </div>
+            <p className="sandboxStateReadout">Every pulse is animated and scored with this pulse-length error.</p>
+          </section>
+        ) : null}
+
         {renderCircuitPanel("mobileCircuit")}
 
         <section className="panelSection gatesSection">
@@ -890,7 +1016,7 @@ export default function App() {
               Replay
             </button>
           </div>
-          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : `${puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: ${puzzle.gateSetLabel ?? "All gates available"}`} - {gateUsageText}</p>
+          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : `${isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: ${puzzle.gateSetLabel ?? "All gates available"}`} - {gateUsageText}</p>
           <div className="gateGrid">
             {visibleGateOrder.map((gateName) => (
               <button
@@ -1025,8 +1151,15 @@ function LevelSelectScreen({
   const xpPercent = Math.round((xpIntoRank / RANK_XP) * 100);
   const statePuzzles = puzzlesForMode("state-transfer");
   const designPuzzles = puzzlesForMode("unitary-design");
+  const robustPuzzles = puzzlesForMode("robust-gate-design");
   const stateComplete = completedCountForMode("state-transfer", progress);
   const designComplete = completedCountForMode("unitary-design", progress);
+  const robustComplete = completedCountForMode("robust-gate-design", progress);
+  const modeCards: Array<{ complete: number; mode: PuzzleMode; total: number }> = [
+    { mode: "state-transfer", complete: stateComplete, total: statePuzzles.length },
+    { mode: "unitary-design", complete: designComplete, total: designPuzzles.length },
+    { mode: "robust-gate-design", complete: robustComplete, total: robustPuzzles.length },
+  ];
 
   const renderLevelCards = (mode: PuzzleMode, title: string) => {
     const modePuzzles = puzzlesForMode(mode);
@@ -1055,7 +1188,7 @@ function LevelSelectScreen({
               <h2>{item.title}</h2>
               <p>Gate limit: {item.gateLimit} {item.gateLimit === 1 ? "gate" : "gates"}.</p>
               {item.gateSetLabel ? <p className="levelGateSet">{item.gateSetLabel}</p> : null}
-              {item.kind === "gate-design" ? <p className="levelModeTag">Gate design</p> : null}
+              {modeTagForPuzzle(item) ? <p className="levelModeTag">{modeTagForPuzzle(item)}</p> : null}
               <div className="levelCardStats">
                 <span>{record?.solved ? `Best: ${record.bestScore}` : `${xpForPuzzle(item, item.gateLimit)} XP`}</span>
                 <span>{record?.bestGates ? `${record.bestGates} gates` : "No run yet"}</span>
@@ -1068,10 +1201,8 @@ function LevelSelectScreen({
   };
 
   if (selectedMode) {
-    const title = selectedMode === "state-transfer" ? "State-to-state transfer" : "Unitary design";
-    const copy = selectedMode === "state-transfer"
-      ? "Move |0⟩ to a specific target state using the given gates."
-      : "Engineer a target unitary using the given gates.";
+    const title = modeTitle(selectedMode);
+    const copy = modeCopy(selectedMode);
     const modePuzzles = puzzlesForMode(selectedMode);
     const modeComplete = completedCountForMode(selectedMode, progress);
     const nextPuzzle = nextPuzzleForMode(selectedMode, progress);
@@ -1083,7 +1214,7 @@ function LevelSelectScreen({
             Back to modes
           </button>
           <div className="modeSubmenuCopy">
-            <p className="eyebrow">{selectedMode === "state-transfer" ? "State mode" : "Design mode"}</p>
+            <p className="eyebrow">{modeEyebrow(selectedMode)}</p>
             <h1>{title}</h1>
             <p>{copy}</p>
           </div>
@@ -1108,35 +1239,36 @@ function LevelSelectScreen({
         <div className="levelHeroCopy">
           <h1>QUBIT GOLF</h1>
           <p>
-            Choose a mode: experiment freely, move one state to another, or design a full one-qubit unitary from gates.
+            Choose a challenge mode: move states, synthesize unitary gates, or build circuits that resist pulse errors.
           </p>
-          {allLevelsComplete ? (
-            <button type="button" className="primaryButton" onClick={showCompletion}>
-              View certificate
+          <div className="levelHeroActions mainMenuActions">
+            {allLevelsComplete ? (
+              <button type="button" className="primaryButton" onClick={showCompletion}>
+                View certificate
+              </button>
+            ) : null}
+            <button type="button" className="menuButton sandboxButton" onClick={startSandbox} aria-label="Start sandbox">
+              Open sandbox
             </button>
-          ) : null}
+          </div>
           <div className="mobileMenuGraphic" aria-hidden="true">
             <MenuGraphic />
           </div>
           <section className="modeCardGrid mainMenuModes" aria-label="Game modes">
-            <button type="button" className="modeCard sandboxModeCard" onClick={startSandbox} aria-label="Start sandbox">
-              <span>Mode 1</span>
-              <h2>Sandbox</h2>
-              <p>Practice single-qubit operations using standard gates.</p>
-              <strong>Start sandbox</strong>
-            </button>
-            <button type="button" className="modeCard" onClick={() => setSelectedMode("state-transfer")} aria-label="Open State-to-state transfer levels">
-              <span>Mode 2</span>
-              <h2>State-to-state transfer</h2>
-              <p>Move |0⟩ to a specific target state using the given gates.</p>
-              <strong>{stateComplete} / {statePuzzles.length} cleared · View levels</strong>
-            </button>
-            <button type="button" className="modeCard" onClick={() => setSelectedMode("unitary-design")} aria-label="Open Unitary design levels">
-              <span>Mode 3</span>
-              <h2>Unitary design</h2>
-              <p>Engineer a target unitary using the given gates.</p>
-              <strong>{designComplete} / {designPuzzles.length} cleared · View levels</strong>
-            </button>
+            {modeCards.map((card, index) => (
+              <button
+                type="button"
+                className="modeCard"
+                key={card.mode}
+                onClick={() => setSelectedMode(card.mode)}
+                aria-label={"Open " + modeTitle(card.mode) + " levels"}
+              >
+                <span>Mode {index + 1}</span>
+                <h2>{modeTitle(card.mode)}</h2>
+                <p>{modeCopy(card.mode)}</p>
+                <strong>{card.complete} / {card.total} cleared - View levels</strong>
+              </button>
+            ))}
           </section>
         </div>
 
