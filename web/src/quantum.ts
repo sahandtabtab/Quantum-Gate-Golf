@@ -97,8 +97,6 @@ export const STANDARD_GATES: Record<string, Gate> = {
   XM180: pulseGate("XM180", "(\u03c0)_{-x}", 180, Math.PI, "negative x-axis \u03c0 pulse"),
   YM180: pulseGate("YM180", "(\u03c0)_{-y}", 270, Math.PI, "negative y-axis \u03c0 pulse"),
   XM360: pulseGate("XM360", "(2\u03c0)_{-x}", 180, 2 * Math.PI, "negative x-axis 2\u03c0 pulse"),
-  SK1P360: pulseGate("SK1P360", "(2\u03c0)_{97.2\u00b0}", 97.1807558, 2 * Math.PI, "2\u03c0 correction at +97.2\u00b0"),
-  SK1M360: pulseGate("SK1M360", "(2\u03c0)_{-97.2\u00b0}", -97.1807558, 2 * Math.PI, "2\u03c0 correction at -97.2\u00b0"),
 };
 
 const STATE_ZERO = INITIAL_STATE;
@@ -416,22 +414,6 @@ export const PUZZLES: Puzzle[] = [
     cases: operationCases(["Y"], DESIGN_PROBES),
   },
   {
-    id: "robust_sk1_x90",
-    title: "Robust (\u03c0/2)_x",
-    targetState: targetFromStateSequence(STATE_ZERO, ["X90"]),
-    gateLimit: 3,
-    solution: ["X90", "SK1P360", "SK1M360"],
-    allowedGates: ["X90", "Y90", "X180", "Y180", "SK1P360", "SK1M360"],
-    gateSetLabel: "Target (\u03c0/2)_x with 2\u03c0 correction pulses",
-    kind: "gate-design",
-    robust: true,
-    defaultErrorEpsilon: 0.05,
-    successThreshold: 0.99995,
-    mission: "Build a robust (\u03c0/2)_x operation with correction pulses, then pass every probe.",
-    targetOperation: ["X90"],
-    cases: operationCases(["X90"], DESIGN_PROBES),
-  },
-  {
     id: "robust_90_180_transfer",
     title: "90-180 transfer",
     targetState: targetFromStateSequence(STATE_ZERO, ["X90", "P120_180"]),
@@ -442,7 +424,7 @@ export const PUZZLES: Puzzle[] = [
     robust: true,
     defaultErrorEpsilon: 0.05,
     successThreshold: 0.999,
-    mission: "Recreate a 90-180 composite transfer while the pulses overrotate by \u03b5.",
+    mission: "Hit the target with a clean 90/180 composite pulse while every pulse overrotates by \u03b5.",
   },
   {
     id: "robust_unitary_90_180",

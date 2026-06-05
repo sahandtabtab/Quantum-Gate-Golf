@@ -17,7 +17,7 @@ import {
 import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
-const ROBUST_GATE_ORDER = ["X90", "SK1P360", "SK1M360", "Y90", "P120_180", "X180", "Y180", "XM180", "YM180", "XM360"];
+const ROBUST_GATE_ORDER = ["X90", "Y90", "P120_180", "X180", "Y180", "XM180", "YM180", "XM360"];
 const DEFAULT_ROBUST_EPSILON = "0.05";
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;

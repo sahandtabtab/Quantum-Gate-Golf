@@ -3,8 +3,8 @@ import { PUZZLES, STANDARD_GATES, evaluatePuzzle, type Puzzle } from "../src/qua
 
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 
-test("robust x90 challenge requires correction pulses", () => {
-  const puzzle = PUZZLES.find((item) => item.id === "robust_sk1_x90");
+test("robust 90-180 challenge rejects one noisy pulse", () => {
+  const puzzle = PUZZLES.find((item) => item.id === "robust_90_180_transfer");
   expect(puzzle).toBeTruthy();
   const robustPuzzle = puzzle!;
   const threshold = robustPuzzle.successThreshold ?? 0.999;
@@ -166,9 +166,9 @@ test("robust gate design exposes tunable overrotation and noisy pulses", async (
 
   await expect(page.getByLabel("Robust overrotation error")).toBeVisible();
   await expect(page.getByText("Pulse error: \u03b5 = +0.050")).toBeVisible();
-  await expect(page.getByLabel("Puzzle status").getByText("Target (\u03c0/2)x with 2\u03c0 correction pulses")).toBeVisible();
+  await expect(page.getByLabel("Puzzle status").getByText("Composite sequence: (\u03c0/2)x (\u03c0)120\u00b0")).toBeVisible();
   await expect(page.getByRole("button", { name: /x-axis \u03c0\/2 pulse/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /2\u03c0 correction at \+97\.2/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /\u03c0 pulse at 120\u00b0 phase/ })).toBeVisible();
 
 });
 
