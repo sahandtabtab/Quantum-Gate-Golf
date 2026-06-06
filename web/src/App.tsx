@@ -183,7 +183,7 @@ function formatEpsilon(value: number): string {
   return sign + value.toFixed(3);
 }
 
-function formatFidelityExpansion(expansion: { constant: number; linear: number; quadratic: number }): string {
+function formatFidelityExpansion(expansion: { constant: number; linear: number; quadratic: number }): ReactNode {
   const threshold = 0.0005;
   const terms = [`${expansion.constant.toFixed(4)}`];
   let remainderOrder = 3;
@@ -199,7 +199,7 @@ function formatFidelityExpansion(expansion: { constant: number; linear: number; 
     addTerm(expansion.quadratic, "\u03b5\u00b2");
   }
 
-  return `F(${"\u03b5"}) = ${terms.join(" ")} + O(${"\u03b5"}^${remainderOrder})`;
+  return <>{`F(${"\u03b5"}) = ${terms.join(" ")} + O(${"\u03b5"}`}<sup>{remainderOrder}</sup>{")"}</>;
 }
 
 function successThresholdForPuzzle(puzzle: Puzzle): number {
@@ -1116,7 +1116,7 @@ export default function App() {
             ) : null}
             {isRobust ? (
               <div>
-                <dt>{"\u03b5"} expansion</dt>
+                <dt className="fidelityExpansionLabel">Fidelity expansion</dt>
                 <dd className="mathReadout">{robustFidelityExpansion ? formatFidelityExpansion(robustFidelityExpansion) : "Add gates to estimate."}</dd>
               </div>
             ) : null}

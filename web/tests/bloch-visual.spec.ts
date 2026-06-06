@@ -186,10 +186,11 @@ test("robust gate design exposes controls without noisy helper text", async ({ p
   await expect(page.getByText(/Move \|0/)).not.toBeVisible();
   await expect(page.getByRole("button", { name: /^\(\u03c0\/2\)y y-axis \u03c0\/2 pulse$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /x-axis \u03c0 pulse/ })).toBeVisible();
-  await expect(page.getByText("\u03b5 expansion")).toBeVisible();
+  await expect(page.getByText("Fidelity expansion")).toBeVisible();
   await expect(page.getByText("Add gates to estimate.")).toBeVisible();
   await clickGate(page, "Y90");
-  await expect(page.getByText(/F\(\u03b5\) = .*\+ O\(\u03b5\^[23]\)/)).toBeVisible();
+  await expect(page.getByText(/F\(\u03b5\) = .*\+ O\(\u03b5[23]\)/)).toBeVisible();
+  await expect(page.getByText(/O\(\u03b5\^[23]\)/)).not.toBeVisible();
   await expect(page.getByText(/F\(\u03b5\).*\u2248/)).not.toBeVisible();
 });
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {

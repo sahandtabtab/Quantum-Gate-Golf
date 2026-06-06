@@ -1317,6 +1317,11 @@ select {
   font-size: 0.98rem;
 }
 
+.details dt.fidelityExpansionLabel {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .details .probeCaseList {
   display: grid;
   gap: 7px;
