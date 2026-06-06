@@ -7,6 +7,7 @@ import {
   STANDARD_GATES,
   blochVector,
   evaluatePuzzle,
+  fidelityExpansionForSequence,
   formatAngles,
   formatState,
   isPuzzleSolved,
@@ -18,7 +19,7 @@ import {
 import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
-const ROBUST_GATE_ORDER = ["X90", "Y90", "XM90", "YM90", "X180", "Y180", "XM180", "YM180", "XM360"];
+const ROBUST_GATE_ORDER = ["X45", "Y45", "X90", "Y90", "XM90", "YM90", "X180", "Y180", "XM180", "YM180", "XM360"];
 const DEFAULT_ROBUST_EPSILON = "0.05";
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
@@ -182,6 +183,22 @@ function formatEpsilon(value: number): string {
   return sign + value.toFixed(3);
 }
 
+function formatFidelityExpansion(expansion: { constant: number; linear: number; quadratic: number }): string {
+  const terms = [`${expansion.constant.toFixed(4)}`];
+  const addTerm = (coefficient: number, label: string) => {
+    if (Math.abs(coefficient) < 0.0005) {
+      return;
+    }
+    const sign = coefficient >= 0 ? "+" : "-";
+    terms.push(`${sign} ${Math.abs(coefficient).toFixed(3)}${label}`);
+  };
+
+  addTerm(expansion.linear, "\u03b5");
+  addTerm(expansion.quadratic, "\u03b5\u00b2");
+
+  return `F(${"\u03b5"}) ${"\u2248"} ${terms.join(" ")}`;
+}
+
 function successThresholdForPuzzle(puzzle: Puzzle): number {
   return puzzle.successThreshold ?? 0.999;
 }
@@ -290,6 +307,7 @@ export default function App() {
     [activeOverrotationEpsilon, activePuzzleCases, displaySequence, showProbeVectors],
   );
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence, activeOverrotationEpsilon), [activeOverrotationEpsilon, puzzle, displaySequence]);
+  const robustFidelityExpansion = useMemo(() => isRobust && sequence.length > 0 ? fidelityExpansionForSequence(puzzle, sequence) : null, [isRobust, puzzle, sequence]);
   const unitarySpec = useMemo(() => unitarySpecForPuzzle(puzzle), [puzzle]);
   const solved = !isSandbox && resultRevealed && isPuzzleSolved(puzzle, result.fidelity, displaySequence.length);
   const circuitStartLabel = showProbeVectors ? "probes" : primaryCase.startLabel;
@@ -1091,6 +1109,12 @@ export default function App() {
               <div>
                 <dt>Current</dt>
                 <dd className="mathReadout">{resultRevealed ? (sandboxProbeMode === "trio" && isSandbox ? `${result.cases.length} probe outputs` : formatAngles(result.finalBloch)) : isSandbox ? (sandboxProbeMode === "trio" ? "Run circuit to transform all probes." : formatAngles(blochVector(sandboxInitialState))) : "Run circuit to reveal."}</dd>
+              </div>
+            ) : null}
+            {isRobust ? (
+              <div>
+                <dt>{"\u03b5"} expansion</dt>
+                <dd className="mathReadout">{robustFidelityExpansion ? formatFidelityExpansion(robustFidelityExpansion) : "Add gates to estimate."}</dd>
               </div>
             ) : null}
             {isSandbox && sandboxProbeMode === "trio" ? (

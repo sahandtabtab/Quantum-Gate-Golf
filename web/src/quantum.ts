@@ -64,6 +64,12 @@ export type PuzzleResult = {
   cases: PuzzleCaseResult[];
 };
 
+export type FidelityExpansion = {
+  constant: number;
+  linear: number;
+  quadratic: number;
+};
+
 const EPSILON = 1e-12;
 const SQRT_HALF = 1 / Math.sqrt(2);
 
@@ -89,6 +95,8 @@ export const STANDARD_GATES: Record<string, Gate> = {
   SDG: gate("SDG", "S\u207b\u00b9", [[c(1), c(0)], [c(0), c(0, -1)]], "Inverse S", [0, 0, 1], -Math.PI / 2),
   T: gate("T", "T", [[c(1), c(0)], [c(0), phase(Math.PI / 4)]], "Eighth phase", [0, 0, 1], Math.PI / 4),
   TDG: gate("TDG", "T\u207b\u00b9", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
+  X45: pulseGate("X45", "(\u03c0/4)_x", 0, Math.PI / 4, "x-axis \u03c0/4 pulse"),
+  Y45: pulseGate("Y45", "(\u03c0/4)_y", 90, Math.PI / 4, "y-axis \u03c0/4 pulse"),
   X90: pulseGate("X90", "(\u03c0/2)_x", 0, Math.PI / 2, "x-axis \u03c0/2 pulse"),
   Y90: pulseGate("Y90", "(\u03c0/2)_y", 90, Math.PI / 2, "y-axis \u03c0/2 pulse"),
   XM90: pulseGate("XM90", "(\u03c0/2)_{-x}", 180, Math.PI / 2, "negative x-axis \u03c0/2 pulse"),
@@ -432,10 +440,10 @@ export const PUZZLES: Puzzle[] = [
     id: "robust_tipping_pulse",
     title: "Robust tipping pulse",
     targetState: STATE_PLUS_X,
-    gateLimit: 2,
-    solution: ["Y90", "XM90"],
-    allowedGates: ["X90", "Y90", "XM90", "YM90", "X180", "Y180"],
-    gateSetLabel: "Quadrature half-pulses",
+    gateLimit: 4,
+    solution: ["X45", "Y90", "XM90", "Y45"],
+    allowedGates: ["X45", "Y45", "X90", "Y90", "XM90", "YM90", "X180", "Y180"],
+    gateSetLabel: "Quarter and half pulses",
     robust: true,
     defaultErrorEpsilon: 0.05,
     successThreshold: 0.998,
@@ -616,6 +624,18 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[], overrotationE
     score: Math.max(0, accuracyPoints + solvedBonus + remainingGateBonus - overLimitPenalty),
     gateFidelity,
     cases: caseResults,
+  };
+}
+
+export function fidelityExpansionForSequence(puzzle: Puzzle, sequence: string[], step = 0.001): FidelityExpansion {
+  const f0 = evaluatePuzzle(puzzle, sequence, 0).fidelity;
+  const fPlus = evaluatePuzzle(puzzle, sequence, step).fidelity;
+  const fMinus = evaluatePuzzle(puzzle, sequence, -step).fidelity;
+
+  return {
+    constant: f0,
+    linear: (fPlus - fMinus) / (2 * step),
+    quadratic: (fPlus - 2 * f0 + fMinus) / (2 * step * step),
   };
 }
 

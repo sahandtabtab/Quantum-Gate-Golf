@@ -4,6 +4,8 @@ import { PUZZLES, STANDARD_GATES, evaluatePuzzle, isPuzzleSolved, type Puzzle } 
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 
 test("robust composite levels reject noisy shortcuts", () => {
+  expect(PUZZLES.find((item) => item.id === "robust_tipping_pulse")?.solution).toEqual(["X45", "Y90", "XM90", "Y45"]);
+
   const checks: Array<[string, string[]]> = [
     ["robust_bit_flip", ["X180"]],
     ["robust_tipping_pulse", ["Y90"]],
@@ -184,6 +186,8 @@ test("robust gate design exposes controls without noisy helper text", async ({ p
   await expect(page.getByText(/Move \|0/)).not.toBeVisible();
   await expect(page.getByRole("button", { name: /^\(\u03c0\/2\)y y-axis \u03c0\/2 pulse$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /x-axis \u03c0 pulse/ })).toBeVisible();
+  await expect(page.getByText("\u03b5 expansion")).toBeVisible();
+  await expect(page.getByText("Add gates to estimate.")).toBeVisible();
 });
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
