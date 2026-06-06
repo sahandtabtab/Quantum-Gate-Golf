@@ -184,19 +184,22 @@ function formatEpsilon(value: number): string {
 }
 
 function formatFidelityExpansion(expansion: { constant: number; linear: number; quadratic: number }): string {
+  const threshold = 0.0005;
   const terms = [`${expansion.constant.toFixed(4)}`];
+  let remainderOrder = 3;
   const addTerm = (coefficient: number, label: string) => {
-    if (Math.abs(coefficient) < 0.0005) {
-      return;
-    }
     const sign = coefficient >= 0 ? "+" : "-";
     terms.push(`${sign} ${Math.abs(coefficient).toFixed(3)}${label}`);
   };
 
-  addTerm(expansion.linear, "\u03b5");
-  addTerm(expansion.quadratic, "\u03b5\u00b2");
+  if (Math.abs(expansion.linear) >= threshold) {
+    addTerm(expansion.linear, "\u03b5");
+    remainderOrder = 2;
+  } else if (Math.abs(expansion.quadratic) >= threshold) {
+    addTerm(expansion.quadratic, "\u03b5\u00b2");
+  }
 
-  return `F(${"\u03b5"}) ${"\u2248"} ${terms.join(" ")}`;
+  return `F(${"\u03b5"}) = ${terms.join(" ")} + O(${"\u03b5"}^${remainderOrder})`;
 }
 
 function successThresholdForPuzzle(puzzle: Puzzle): number {
