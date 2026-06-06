@@ -1,16 +1,28 @@
 import { expect, test, type Page } from "@playwright/test";
-import { PUZZLES, STANDARD_GATES, evaluatePuzzle, type Puzzle } from "../src/quantum";
+import { PUZZLES, STANDARD_GATES, evaluatePuzzle, isPuzzleSolved, type Puzzle } from "../src/quantum";
 
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 
-test("robust 90-180 challenge rejects one noisy pulse", () => {
-  const puzzle = PUZZLES.find((item) => item.id === "robust_90_180_transfer");
-  expect(puzzle).toBeTruthy();
-  const robustPuzzle = puzzle!;
-  const threshold = robustPuzzle.successThreshold ?? 0.999;
+test("robust composite levels reject noisy shortcuts", () => {
+  const checks: Array<[string, string[]]> = [
+    ["robust_bit_flip", ["X180"]],
+    ["robust_tipping_pulse", ["Y90"]],
+    ["robust_x_gate", ["X180"]],
+  ];
 
-  expect(evaluatePuzzle(robustPuzzle, ["X90"], 0.05).fidelity).toBeLessThan(threshold);
-  expect(evaluatePuzzle(robustPuzzle, robustPuzzle.solution, 0.05).fidelity).toBeGreaterThanOrEqual(threshold);
+  for (const [puzzleId, shortcut] of checks) {
+    const puzzle = PUZZLES.find((item) => item.id === puzzleId);
+    expect(puzzle).toBeTruthy();
+    const robustPuzzle = puzzle!;
+    const threshold = robustPuzzle.successThreshold ?? 0.999;
+
+    const shortcutResult = evaluatePuzzle(robustPuzzle, shortcut, 0.05);
+    const solutionResult = evaluatePuzzle(robustPuzzle, robustPuzzle.solution, 0.05);
+
+    expect(isPuzzleSolved(robustPuzzle, shortcutResult.fidelity, shortcut.length)).toBe(false);
+    expect(solutionResult.fidelity).toBeGreaterThanOrEqual(threshold);
+    expect(isPuzzleSolved(robustPuzzle, solutionResult.fidelity, robustPuzzle.solution.length)).toBe(true);
+  }
 });
 
 test("desktop Bloch scene renders nonblank WebGL pixels", async ({ page }) => {
@@ -155,7 +167,7 @@ test("unitary design readout uses unitary metrics instead of state metrics", asy
   await expect(details.getByText(/^State$/)).not.toBeVisible();
 });
 
-test("robust gate design exposes tunable overrotation and noisy pulses", async ({ page }) => {
+test("robust gate design exposes controls without noisy helper text", async ({ page }) => {
   test.setTimeout(45000);
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.goto("/");
@@ -164,14 +176,15 @@ test("robust gate design exposes tunable overrotation and noisy pulses", async (
   await page.getByRole("button", { name: /Open Robust gate design levels/ }).click();
   await page.getByRole("button", { name: /Start Robust gate design Level 1/ }).click();
 
+  await expect(page.getByRole("heading", { name: "Robust bit flip" })).toBeVisible();
   await expect(page.getByLabel("Robust overrotation error")).toBeVisible();
-  await expect(page.getByText("Pulse error: \u03b5 = +0.050")).toBeVisible();
-  await expect(page.getByLabel("Puzzle status").getByText("Composite sequence: (\u03c0/2)x (\u03c0)120\u00b0")).toBeVisible();
-  await expect(page.getByRole("button", { name: /x-axis \u03c0\/2 pulse/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /\u03c0 pulse at 120\u00b0 phase/ })).toBeVisible();
-
+  await expect(page.getByText("Pulse error: \u03b5 = +0.050")).not.toBeVisible();
+  await expect(page.getByText("Every pulse is animated and scored with this pulse-length error.")).not.toBeVisible();
+  await expect(page.getByText(/Noisy gate set/)).not.toBeVisible();
+  await expect(page.getByText(/Move \|0/)).not.toBeVisible();
+  await expect(page.getByRole("button", { name: /^\(\u03c0\/2\)y y-axis \u03c0\/2 pulse$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /x-axis \u03c0 pulse/ })).toBeVisible();
 });
-
 test("gate edits wait for RUN before revealing a result", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 840 });
   await startFirstLevel(page);
@@ -323,10 +336,13 @@ async function seedProgressForPuzzles(page: Page, puzzles: Puzzle[]) {
 
 async function clickGate(page: Page, gateName: string) {
   const gate = STANDARD_GATES[gateName];
-  const label = new RegExp(`${escapeRegex(gate.description)}$`);
+  const label = new RegExp(`^${escapeRegex(accessibleGateSymbol(gate.symbol))}\\s+${escapeRegex(gate.description)}$`);
   await page.getByRole("button", { name: label }).click({ force: true });
 }
 
+function accessibleGateSymbol(symbol: string): string {
+  return symbol.replace(/_\{([^}]+)\}|_([^_\s{}()[\],;]+)/g, (_match, bracedSubscript: string | undefined, simpleSubscript: string | undefined) => bracedSubscript ?? simpleSubscript ?? "");
+}
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

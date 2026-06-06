@@ -91,6 +91,8 @@ export const STANDARD_GATES: Record<string, Gate> = {
   TDG: gate("TDG", "T\u207b\u00b9", [[c(1), c(0)], [c(0), phase(-Math.PI / 4)]], "Inverse T", [0, 0, 1], -Math.PI / 4),
   X90: pulseGate("X90", "(\u03c0/2)_x", 0, Math.PI / 2, "x-axis \u03c0/2 pulse"),
   Y90: pulseGate("Y90", "(\u03c0/2)_y", 90, Math.PI / 2, "y-axis \u03c0/2 pulse"),
+  XM90: pulseGate("XM90", "(\u03c0/2)_{-x}", 180, Math.PI / 2, "negative x-axis \u03c0/2 pulse"),
+  YM90: pulseGate("YM90", "(\u03c0/2)_{-y}", 270, Math.PI / 2, "negative y-axis \u03c0/2 pulse"),
   X180: pulseGate("X180", "(\u03c0)_x", 0, Math.PI, "x-axis \u03c0 pulse"),
   Y180: pulseGate("Y180", "(\u03c0)_y", 90, Math.PI, "y-axis \u03c0 pulse"),
   P120_180: pulseGate("P120_180", "(\u03c0)_{120\u00b0}", 120, Math.PI, "\u03c0 pulse at 120\u00b0 phase"),
@@ -414,49 +416,46 @@ export const PUZZLES: Puzzle[] = [
     cases: operationCases(["Y"], DESIGN_PROBES),
   },
   {
-    id: "robust_90_180_transfer",
-    title: "90-180 transfer",
-    targetState: targetFromStateSequence(STATE_ZERO, ["X90", "P120_180"]),
-    gateLimit: 2,
-    solution: ["X90", "P120_180"],
-    allowedGates: ["X90", "Y90", "X180", "Y180", "P120_180"],
-    gateSetLabel: "Composite sequence: (\u03c0/2)_x (\u03c0)_{120\u00b0}",
+    id: "robust_bit_flip",
+    title: "Robust bit flip",
+    targetState: [c(0), c(1)],
+    gateLimit: 3,
+    solution: ["Y90", "X180", "Y90"],
+    allowedGates: ["X90", "Y90", "XM90", "YM90", "X180", "Y180"],
+    gateSetLabel: "Half-pulse toolbox",
     robust: true,
     defaultErrorEpsilon: 0.05,
-    successThreshold: 0.999,
-    mission: "Hit the target with a clean 90/180 composite pulse while every pulse overrotates by \u03b5.",
+    successThreshold: 0.998,
+    mission: "Move |0\u27e9 to |1\u27e9 with a composite bit-flip pulse.",
   },
   {
-    id: "robust_unitary_90_180",
-    title: "Design 90-180 composite",
-    targetState: targetFromStateSequence(STATE_ZERO, ["X90", "P120_180"]),
+    id: "robust_tipping_pulse",
+    title: "Robust tipping pulse",
+    targetState: STATE_PLUS_X,
     gateLimit: 2,
-    solution: ["X90", "P120_180"],
-    allowedGates: ["X90", "Y90", "X180", "Y180", "P120_180"],
-    gateSetLabel: "Composite unitary: (\u03c0/2)_x (\u03c0)_{120\u00b0}",
+    solution: ["Y90", "XM90"],
+    allowedGates: ["X90", "Y90", "XM90", "YM90", "X180", "Y180"],
+    gateSetLabel: "Quadrature half-pulses",
+    robust: true,
+    defaultErrorEpsilon: 0.05,
+    successThreshold: 0.998,
+    mission: "Tip |0\u27e9 to |+x\u27e9 with a composite pulse.",
+  },
+  {
+    id: "robust_x_gate",
+    title: "Robust X gate",
+    targetState: targetFromStateSequence(STATE_ZERO, ["X"]),
+    gateLimit: 6,
+    solution: ["X90", "Y90", "X90", "YM90", "X90", "Y90"],
+    allowedGates: ["X90", "Y90", "XM90", "YM90", "X180", "Y180"],
+    gateSetLabel: "Half-pulse toolbox",
     kind: "gate-design",
     robust: true,
     defaultErrorEpsilon: 0.05,
-    successThreshold: 0.997,
-    mission: "Make every probe undergo the same 90-180 composite pulse under \u03b5 error.",
-    targetOperation: ["X90", "P120_180"],
-    cases: operationCases(["X90", "P120_180"], DESIGN_PROBES),
-  },
-  {
-    id: "robust_unitary_canonical_train",
-    title: "Design canonical pulse train",
-    targetState: targetFromStateSequence(STATE_ZERO, ["X180", "XM360", "YM180", "XM180", "X90"]),
-    gateLimit: 5,
-    solution: ["X180", "XM360", "YM180", "XM180", "X90"],
-    allowedGates: ["X90", "Y90", "X180", "Y180", "XM180", "YM180", "XM360"],
-    gateSetLabel: "Composite sequence: (\u03c0)_x (2\u03c0)_{-x} (\u03c0)_{-y} (\u03c0)_{-x} (\u03c0/2)_x",
-    kind: "gate-design",
-    robust: true,
-    defaultErrorEpsilon: 0.05,
-    successThreshold: 0.99,
-    mission: "Use canonical-axis pulses to make a robust composite unitary under \u03b5 error.",
-    targetOperation: ["X180", "XM360", "YM180", "XM180", "X90"],
-    cases: operationCases(["X180", "XM360", "YM180", "XM180", "X90"], DESIGN_PROBES),
+    successThreshold: 0.998,
+    mission: "Build a robust X unitary from half-pulses.",
+    targetOperation: ["X"],
+    cases: operationCases(["X"], DESIGN_PROBES),
   },
 ];
 
@@ -601,11 +600,11 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[], overrotationE
     : stateAccuracy;
   const accuracy = puzzle.kind === "gate-design" ? gateFidelity : stateAccuracy;
   const gateCount = sequence.length;
-  const successThreshold = puzzle.successThreshold ?? 0.999;
+  const solved = isPuzzleSolved(puzzle, accuracy, gateCount);
 
   const accuracyPoints = Math.round(1000 * accuracy);
-  const solvedBonus = accuracy >= successThreshold ? 200 : 0;
-  const remainingGateBonus = accuracy >= successThreshold ? Math.max(0, puzzle.gateLimit - gateCount) * 75 : 0;
+  const solvedBonus = solved ? 200 : 0;
+  const remainingGateBonus = solved ? Math.max(0, puzzle.gateLimit - gateCount) * 75 : 0;
   const overLimitPenalty = Math.max(0, gateCount - puzzle.gateLimit) * 250;
 
   return {
@@ -618,6 +617,11 @@ export function evaluatePuzzle(puzzle: Puzzle, sequence: string[], overrotationE
     gateFidelity,
     cases: caseResults,
   };
+}
+
+export function isPuzzleSolved(puzzle: Puzzle, fidelityValue: number, gateCount: number): boolean {
+  const usesFullComposite = !puzzle.robust || gateCount === puzzle.gateLimit;
+  return fidelityValue >= (puzzle.successThreshold ?? 0.999) && usesFullComposite;
 }
 
 function evaluatePuzzleCase(puzzleCase: PuzzleCase, sequence: string[], overrotationEpsilon = 0): PuzzleCaseResult {

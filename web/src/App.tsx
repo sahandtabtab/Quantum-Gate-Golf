@@ -9,6 +9,7 @@ import {
   evaluatePuzzle,
   formatAngles,
   formatState,
+  isPuzzleSolved,
   puzzleCases,
   stateFromBloch,
   sequenceStates,
@@ -17,7 +18,7 @@ import {
 import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
-const ROBUST_GATE_ORDER = ["X90", "Y90", "P120_180", "X180", "Y180", "XM180", "YM180", "XM360"];
+const ROBUST_GATE_ORDER = ["X90", "Y90", "XM90", "YM90", "X180", "Y180", "XM180", "YM180", "XM360"];
 const DEFAULT_ROBUST_EPSILON = "0.05";
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
@@ -290,7 +291,7 @@ export default function App() {
   );
   const result = useMemo(() => evaluatePuzzle(puzzle, displaySequence, activeOverrotationEpsilon), [activeOverrotationEpsilon, puzzle, displaySequence]);
   const unitarySpec = useMemo(() => unitarySpecForPuzzle(puzzle), [puzzle]);
-  const solved = !isSandbox && resultRevealed && result.fidelity >= puzzleSuccessThreshold;
+  const solved = !isSandbox && resultRevealed && isPuzzleSolved(puzzle, result.fidelity, displaySequence.length);
   const circuitStartLabel = showProbeVectors ? "probes" : primaryCase.startLabel;
   const circuitEndLabel = puzzleKind === "gate-design" ? "targets" : sandboxProbeMode === "trio" && isSandbox ? "outputs" : "|ψ⟩";
   const statusText = isSandbox
@@ -629,7 +630,7 @@ export default function App() {
       return;
     }
 
-    if (activeRun.result.fidelity < successThresholdForPuzzle(activeRun.puzzle)) {
+    if (!isPuzzleSolved(activeRun.puzzle, activeRun.result.fidelity, activeRun.sequence.length)) {
       playLoss();
       return;
     }
@@ -676,7 +677,7 @@ export default function App() {
       puzzle,
       sequence: runSequence,
       result: runResult,
-      completesWholeGame: puzzle.kind !== "sandbox" && runResult.fidelity >= puzzleSuccessThreshold && runCompletesWholeGame(progress, puzzle.id),
+      completesWholeGame: puzzle.kind !== "sandbox" && isPuzzleSolved(puzzle, runResult.fidelity, runSequence.length) && runCompletesWholeGame(progress, puzzle.id),
     };
 
     setDisplaySequence(runSequence);
@@ -903,24 +904,19 @@ export default function App() {
             {statusText}
           </span>
           <h1>{renderMathLabel(puzzle.title)}</h1>
-          <p>{renderMathLabel(puzzle.mission ?? "Choose gates that move the starting state to the target on the Bloch sphere.")}</p>
+          {!isRobust ? <p>{renderMathLabel(puzzle.mission ?? "Choose gates that move the starting state to the target on the Bloch sphere.")}</p> : null}
           <p className="objectiveMeta">
             {isSandbox
               ? `Free build cap: ${puzzle.gateLimit} gates.`
               : `Gate limit: ${puzzle.gateLimit} ${puzzle.gateLimit === 1 ? "gate" : "gates"}.`}
           </p>
-          {isRobust ? (
-            <p className="objectiveMeta robustObjectiveMeta">
-              Pulse error: {"\u03b5"} = {formatEpsilon(activeOverrotationEpsilon)}; pulse angles run at {(1 + activeOverrotationEpsilon).toFixed(3)}x.
-            </p>
-          ) : null}
           {unitarySpec ? (
             <p className="unitarySpecMeta">
               <strong>Target unitary:</strong>
               <span>{unitarySpec}</span>
             </p>
           ) : null}
-          {puzzle.gateSetLabel ? <p className="gateSetMeta">{isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {renderMathLabel(puzzle.gateSetLabel)}</p> : null}
+          {puzzle.gateSetLabel && !isRobust ? <p className="gateSetMeta">{puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {renderMathLabel(puzzle.gateSetLabel)}</p> : null}
           {solved && nextLevel ? (
             <button type="button" className="primaryButton compactButton" onClick={() => startPuzzle(nextLevel.id)}>
               Next level
@@ -1048,7 +1044,6 @@ export default function App() {
                 <input type="text" value={(1 + activeOverrotationEpsilon).toFixed(3) + "x"} readOnly />
               </label>
             </div>
-            <p className="sandboxStateReadout">Every pulse is animated and scored with this pulse-length error.</p>
           </section>
         ) : null}
 
@@ -1061,7 +1056,7 @@ export default function App() {
               Replay
             </button>
           </div>
-          <p className="gateSetNote">{isSandbox ? "Sandbox mode - all standard gates" : <>{isRobust ? "Noisy gate set" : puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {renderMathLabel(puzzle.gateSetLabel ?? "All gates available")}</>} - {gateUsageText}</p>
+          <p className="gateSetNote">{isSandbox ? `Sandbox mode - all standard gates - ${gateUsageText}` : isRobust ? gateUsageText : <>{puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {renderMathLabel(puzzle.gateSetLabel ?? "All gates available")} - {gateUsageText}</>}</p>
           <div className="gateGrid">
             {visibleGateOrder.map((gateName) => (
               <button
