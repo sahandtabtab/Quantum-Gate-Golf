@@ -917,14 +917,21 @@ button:disabled {
   vertical-align: sub;
 }
 
-.circuitGate.pulseGateSymbol {
+.circuitGate.pulseGateSymbol,
+.circuitGate.customRotationGateSymbol {
   min-width: 54px;
   height: 38px;
   padding: 0 4px;
   font-size: 0.78rem;
 }
 
-.circuitGate.pulseGateSymbol sub {
+.circuitGate.customRotationGateSymbol {
+  min-width: 66px;
+  font-size: 0.74rem;
+}
+
+.circuitGate.pulseGateSymbol sub,
+.circuitGate.customRotationGateSymbol sub {
   font-size: 0.62em;
 }
 
@@ -1032,12 +1039,34 @@ select {
 }
 
 .sandboxStatePanel,
+.sandboxRotationPanel,
 .robustErrorPanel {
   margin-top: 18px;
 }
 
 .robustObjectiveMeta {
   color: var(--cyan-dark);
+}
+
+.fixedErrorGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: baseline;
+}
+
+.fixedErrorGrid span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fixedErrorGrid strong {
+  color: var(--cyan-dark);
+  font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  font-size: 1rem;
 }
 
 .epsilonSlider {
@@ -1126,6 +1155,22 @@ select {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.axisInputGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rotationInputGrid {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  margin-top: 10px;
+}
+
+.sandboxRotationButton {
+  min-height: 40px;
+  margin-top: 0;
+  white-space: nowrap;
 }
 
 .angleInputGrid label {
@@ -1935,7 +1980,7 @@ select {
   }
 
   .gatesSection {
-    order: 3;
+    order: 4;
     margin-top: 12px;
   }
 
@@ -2162,8 +2207,29 @@ select {
     font-size: 0.78rem;
   }
 
-  .controlPanel .mobileCircuit {
+  .sandboxRotationPanel {
     order: 2;
+    margin-top: 0;
+    padding-top: 8px;
+  }
+
+  .axisInputGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rotationInputGrid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-top: 6px;
+  }
+
+  .sandboxRotationButton {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.72rem;
+  }
+
+  .controlPanel .mobileCircuit {
+    order: 3;
     margin: 0 0 8px;
     padding: 8px;
   }
@@ -2219,11 +2285,17 @@ select {
     font-size: 0.82rem;
   }
 
-  .circuitGate.pulseGateSymbol {
+  .circuitGate.pulseGateSymbol,
+  .circuitGate.customRotationGateSymbol {
     min-width: 40px;
     height: 28px;
     padding: 0 2px;
     font-size: 0.62rem;
+  }
+
+  .circuitGate.customRotationGateSymbol {
+    min-width: 48px;
+    font-size: 0.56rem;
   }
 
   .circuitGateUnit {
@@ -2235,6 +2307,11 @@ select {
   .circuitGateUnit.pulseGateUnit {
     flex-basis: 44px;
     width: 44px;
+  }
+
+  .circuitGateUnit.customGateUnit {
+    flex-basis: 52px;
+    width: 52px;
   }
 
   .circuitNudge,

@@ -70,6 +70,7 @@ export type FidelityExpansion = {
   quadratic: number;
 };
 
+const CUSTOM_ROTATION_PREFIX = "ROT:";
 const EPSILON = 1e-12;
 const SQRT_HALF = 1 / Math.sqrt(2);
 
@@ -108,6 +109,31 @@ export const STANDARD_GATES: Record<string, Gate> = {
   YM180: pulseGate("YM180", "(\u03c0)_{-y}", 270, Math.PI, "negative y-axis \u03c0 pulse"),
   XM360: pulseGate("XM360", "(2\u03c0)_{-x}", 180, 2 * Math.PI, "negative x-axis 2\u03c0 pulse"),
 };
+
+export function customRotationGateName(axis: Vec3, angleDegrees: number): string {
+  const unitAxis = normalize3(axis);
+  return `${CUSTOM_ROTATION_PREFIX}${unitAxis.map((component) => cleanNumber(component).toFixed(6)).join(",")},${cleanNumber(angleDegrees).toFixed(6)}`;
+}
+
+export function isCustomRotationGate(gateName: string): boolean {
+  return gateName.startsWith(CUSTOM_ROTATION_PREFIX);
+}
+
+export function gateForName(gateName: string): Gate | null {
+  if (isCustomRotationGate(gateName)) {
+    return customRotationGateFromName(gateName);
+  }
+
+  return STANDARD_GATES[gateName.toUpperCase()] ?? null;
+}
+
+export function gateSymbolForName(gateName: string): string {
+  return gateForName(gateName)?.symbol ?? gateName;
+}
+
+export function gateDescriptionForName(gateName: string): string {
+  return gateForName(gateName)?.description ?? "Custom rotation";
+}
 
 const STATE_ZERO = INITIAL_STATE;
 const STATE_PLUS_X = stateFromBloch(Math.PI / 2, 0);
@@ -476,7 +502,7 @@ export function sequenceStates(
   const states = [state];
 
   for (const gateName of sequence) {
-    const selectedGate = STANDARD_GATES[gateName.toUpperCase()];
+    const selectedGate = gateForName(gateName);
     if (!selectedGate) {
       throw new Error(`Unknown gate: ${gateName}`);
     }
@@ -540,7 +566,7 @@ export function sequenceMatrix(sequence: string[], overrotationEpsilon = 0): Mat
   let matrix = identityMatrix();
 
   for (const gateName of sequence) {
-    const selectedGate = STANDARD_GATES[gateName.toUpperCase()];
+    const selectedGate = gateForName(gateName);
     if (!selectedGate) {
       throw new Error(`Unknown gate: ${gateName}`);
     }
@@ -574,7 +600,7 @@ function operationCases(
   operation: string[],
   probes: Array<[label: string, startLabel: string, startState: QubitState]>,
 ): PuzzleCase[] {
-  const operationLabel = operation.map((gateName) => STANDARD_GATES[gateName]?.symbol ?? gateName).join(" ");
+  const operationLabel = operation.map((gateName) => gateSymbolForName(gateName)).join(" ");
   return probes.map(([label, startLabel, startState]) => ({
     label,
     startLabel,
@@ -658,7 +684,7 @@ function evaluatePuzzleCase(puzzleCase: PuzzleCase, sequence: string[], overrota
 }
 
 export function gateRotation(gateName: string): GateRotation {
-  const selectedGate = STANDARD_GATES[gateName.toUpperCase()];
+  const selectedGate = gateForName(gateName);
   if (!selectedGate) {
     throw new Error(`Unknown gate: ${gateName}`);
   }
@@ -752,6 +778,34 @@ function gate(name: string, symbol: string, matrix: Matrix2, description: string
 function pulseGate(name: string, symbol: string, phaseDegrees: number, angle: number, description: string): Gate {
   const axis = axisFromPhaseDegrees(phaseDegrees);
   return gate(name, symbol, rotationMatrix(axis, angle), description, axis, angle);
+}
+
+function customRotationGateFromName(gateName: string): Gate | null {
+  const rawParts = gateName.slice(CUSTOM_ROTATION_PREFIX.length).split(",");
+  if (rawParts.length !== 4) {
+    return null;
+  }
+
+  const [axisX, axisY, axisZ, angleDegrees] = rawParts.map(Number);
+  if (![axisX, axisY, axisZ, angleDegrees].every(Number.isFinite)) {
+    return null;
+  }
+
+  const axis = normalize3([axisX, axisY, axisZ]);
+  const angle = (angleDegrees * Math.PI) / 180;
+  return gate(
+    gateName,
+    `R_n(${formatCompactDegrees(angleDegrees)}\u00b0)`,
+    rotationMatrix(axis, angle),
+    `${formatCompactDegrees(angleDegrees)} deg rotation about n = (${formatSigned(axis[0])}, ${formatSigned(axis[1])}, ${formatSigned(axis[2])})`,
+    axis,
+    angle,
+  );
+}
+
+function formatCompactDegrees(value: number): string {
+  const cleaned = cleanNumber(value);
+  return Number.isInteger(cleaned) ? String(cleaned) : cleaned.toFixed(1);
 }
 
 function matrixForGate(selectedGate: Gate, overrotationEpsilon: number): Matrix2 {

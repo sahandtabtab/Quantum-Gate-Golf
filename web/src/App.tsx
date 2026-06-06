@@ -4,23 +4,30 @@ import BlochScene from "./BlochScene";
 import {
   PUZZLES,
   SANDBOX_PUZZLE,
-  STANDARD_GATES,
   blochVector,
+  customRotationGateName,
   evaluatePuzzle,
   fidelityExpansionForSequence,
   formatAngles,
   formatState,
+  gateDescriptionForName,
+  gateSymbolForName,
+  isCustomRotationGate,
   isPuzzleSolved,
   puzzleCases,
   stateFromBloch,
   sequenceStates,
   unitarySpecForPuzzle,
 } from "./quantum";
-import type { Puzzle, PuzzleCase, PuzzleResult } from "./quantum";
+import type { Puzzle, PuzzleCase, PuzzleResult, Vec3 } from "./quantum";
 
 const GATE_ORDER = ["X", "Y", "Z", "H", "S", "T", "SDG", "TDG"];
 const ROBUST_GATE_ORDER = ["X45", "Y45", "X90", "Y90", "XM90", "YM90", "X180", "Y180", "XM180", "YM180", "XM360"];
-const DEFAULT_ROBUST_EPSILON = "0.05";
+const FIXED_ROBUST_EPSILON = 0.1;
+const DEFAULT_SANDBOX_ROTATION_AXIS_X = "1";
+const DEFAULT_SANDBOX_ROTATION_AXIS_Y = "0";
+const DEFAULT_SANDBOX_ROTATION_AXIS_Z = "0";
+const DEFAULT_SANDBOX_ROTATION_ANGLE = "90";
 const PROGRESS_STORAGE_KEY = "quantum-gate-golf-progress-v1";
 const RANK_XP = 250;
 const HINT_COST = 220;
@@ -56,11 +63,11 @@ function renderMathLabel(text: string, className = "") {
 }
 
 function gateSymbolText(gateName: string): string {
-  return STANDARD_GATES[gateName]?.symbol ?? gateName;
+  return gateSymbolForName(gateName);
 }
 
 function isPulseGate(gateName: string): boolean {
-  return Boolean(STANDARD_GATES[gateName]?.description.toLowerCase().includes("pulse"));
+  return Boolean(gateDescriptionForName(gateName).toLowerCase().includes("pulse"));
 }
 
 function renderGateSymbol(gateName: string): ReactNode[] {
@@ -243,7 +250,10 @@ export default function App() {
   const [sandboxThetaDegrees, setSandboxThetaDegrees] = useState(DEFAULT_SANDBOX_THETA);
   const [sandboxProbeMode, setSandboxProbeMode] = useState<SandboxProbeMode>("single");
   const [sandboxPhiDegrees, setSandboxPhiDegrees] = useState(DEFAULT_SANDBOX_PHI);
-  const [robustEpsilonInput, setRobustEpsilonInput] = useState(DEFAULT_ROBUST_EPSILON);
+  const [sandboxRotationAxisX, setSandboxRotationAxisX] = useState(DEFAULT_SANDBOX_ROTATION_AXIS_X);
+  const [sandboxRotationAxisY, setSandboxRotationAxisY] = useState(DEFAULT_SANDBOX_ROTATION_AXIS_Y);
+  const [sandboxRotationAxisZ, setSandboxRotationAxisZ] = useState(DEFAULT_SANDBOX_ROTATION_AXIS_Z);
+  const [sandboxRotationAngleDegrees, setSandboxRotationAngleDegrees] = useState(DEFAULT_SANDBOX_ROTATION_ANGLE);
   const revealedRunKeyRef = useRef("");
   const activeRunRef = useRef<ActiveRun | null>(null);
   const activeEntryKeyRef = useRef("");
@@ -258,6 +268,20 @@ export default function App() {
     ),
     [sandboxPhiDegrees, sandboxThetaDegrees],
   );
+  const sandboxRotationAxis = useMemo<Vec3>(
+    () => [
+      parseDegreeInput(sandboxRotationAxisX, 1),
+      parseDegreeInput(sandboxRotationAxisY, 0),
+      parseDegreeInput(sandboxRotationAxisZ, 0),
+    ],
+    [sandboxRotationAxisX, sandboxRotationAxisY, sandboxRotationAxisZ],
+  );
+  const sandboxRotationAxisNorm = Math.hypot(...sandboxRotationAxis);
+  const sandboxRotationAngle = parseDegreeInput(sandboxRotationAngleDegrees, 90);
+  const sandboxCustomRotationGate = sandboxRotationAxisNorm > 1e-8
+    ? customRotationGateName(sandboxRotationAxis, sandboxRotationAngle)
+    : null;
+  const sandboxCustomRotationLabel = sandboxCustomRotationGate ? gateSymbolText(sandboxCustomRotationGate) : "R_n";
   const sandboxCases = useMemo<PuzzleCase[]>(() => {
     if (sandboxProbeMode === "trio") {
       return sandboxUnitaryProbeCases();
@@ -281,9 +305,7 @@ export default function App() {
   const puzzle = isSandbox ? sandboxPuzzle : PUZZLES.find((item) => item.id === puzzleId) ?? PUZZLES[0];
   const puzzleKind = puzzle.kind ?? "target";
   const isRobust = Boolean(puzzle.robust);
-  const robustDefaultEpsilon = puzzle.defaultErrorEpsilon ?? Number(DEFAULT_ROBUST_EPSILON);
-  const robustEpsilon = clampNumber(parseDegreeInput(robustEpsilonInput, robustDefaultEpsilon), -0.1, 0.1);
-  const activeOverrotationEpsilon = isRobust ? robustEpsilon : 0;
+  const activeOverrotationEpsilon = isRobust ? FIXED_ROBUST_EPSILON : 0;
   const puzzleSuccessThreshold = successThresholdForPuzzle(puzzle);
   const activePuzzleCases = useMemo(() => puzzleCases(puzzle), [puzzle]);
   const primaryCase = activePuzzleCases[0];
@@ -344,13 +366,6 @@ export default function App() {
     saveProgress(progress);
   }, [progress]);
 
-  useEffect(() => {
-    if (!puzzle.robust) {
-      return;
-    }
-
-    setRobustEpsilonInput((puzzle.defaultErrorEpsilon ?? Number(DEFAULT_ROBUST_EPSILON)).toFixed(3));
-  }, [puzzle.defaultErrorEpsilon, puzzle.id, puzzle.robust]);
 
   useEffect(() => {
     if (view !== "play" && view !== "sandbox") {
@@ -577,6 +592,25 @@ export default function App() {
     updateDraftSequence((current) => [...current, gateName]);
   };
 
+  const addSandboxCustomRotation = () => {
+    if (!isSandbox) {
+      return;
+    }
+
+    if (sequence.length >= puzzle.gateLimit) {
+      setAnimationLabel("Gate limit reached");
+      return;
+    }
+
+    if (!sandboxCustomRotationGate) {
+      setAnimationLabel("Choose a nonzero rotation axis");
+      return;
+    }
+
+    playClick();
+    updateDraftSequence((current) => [...current, sandboxCustomRotationGate]);
+  };
+
   const undo = () => {
     playClick();
     updateDraftSequence((current) => current.slice(0, -1));
@@ -774,13 +808,6 @@ export default function App() {
     setSandboxProbeMode(mode);
   };
 
-  const setRobustEpsilonValue = (value: string) => {
-    if (isRunning) {
-      return;
-    }
-
-    setRobustEpsilonInput(value);
-  };
 
   const renderCircuitPanel = (className: string) => (
     <section className={`floatingPanel circuitPanel ${className}`} aria-label="Draft quantum circuit">
@@ -806,7 +833,7 @@ export default function App() {
           ) : (
             sequence.map((gateName, index) => (
               <span
-                className={`circuitGateUnit ${isPulseGate(gateName) ? "pulseGateUnit" : ""} ${draggedGateIndex === index ? "dragging" : ""}`}
+                className={`circuitGateUnit ${isPulseGate(gateName) ? "pulseGateUnit" : ""} ${isCustomRotationGate(gateName) ? "customGateUnit" : ""} ${draggedGateIndex === index ? "dragging" : ""}`}
                 draggable={!isRunning && sequence.length > 1}
                 key={`${gateName}-${index}`}
                 onDragEnd={() => setDraggedGateIndex(null)}
@@ -824,7 +851,7 @@ export default function App() {
                 >
                   &lt;
                 </button>
-                <span className={`circuitGate ${isPulseGate(gateName) ? "pulseGateSymbol" : ""}`}>{renderGateSymbol(gateName)}</span>
+                <span className={`circuitGate ${isPulseGate(gateName) ? "pulseGateSymbol" : ""} ${isCustomRotationGate(gateName) ? "customRotationGateSymbol" : ""}`} title={gateDescriptionForName(gateName)}>{renderGateSymbol(gateName)}</span>
                 <button
                   type="button"
                   className="circuitRemove"
@@ -1029,41 +1056,50 @@ export default function App() {
           </section>
         ) : null}
 
+        {isSandbox ? (
+          <section className="panelSection sandboxRotationPanel" aria-label="Sandbox custom rotation">
+            <div className="sectionHeader">
+              <h3>Custom rotation</h3>
+              <span className="sandboxStateKet">{renderMathLabel(sandboxCustomRotationLabel)}</span>
+            </div>
+            <div className="angleInputGrid axisInputGrid" aria-label="Rotation axis">
+              <label>
+                <span>n_x</span>
+                <input type="number" step="0.1" value={sandboxRotationAxisX} onChange={(event) => setSandboxRotationAxisX(event.target.value)} disabled={isRunning} />
+              </label>
+              <label>
+                <span>n_y</span>
+                <input type="number" step="0.1" value={sandboxRotationAxisY} onChange={(event) => setSandboxRotationAxisY(event.target.value)} disabled={isRunning} />
+              </label>
+              <label>
+                <span>n_z</span>
+                <input type="number" step="0.1" value={sandboxRotationAxisZ} onChange={(event) => setSandboxRotationAxisZ(event.target.value)} disabled={isRunning} />
+              </label>
+            </div>
+            <div className="angleInputGrid rotationInputGrid">
+              <label>
+                <span>angle (deg)</span>
+                <input type="number" step="1" value={sandboxRotationAngleDegrees} onChange={(event) => setSandboxRotationAngleDegrees(event.target.value)} disabled={isRunning} />
+              </label>
+              <button type="button" className="primaryButton compactButton sandboxRotationButton" onClick={addSandboxCustomRotation} disabled={isRunning || gateLimitReached || !sandboxCustomRotationGate}>
+                Add rotation
+              </button>
+            </div>
+            <p className="sandboxStateReadout">Axis is normalized automatically.</p>
+          </section>
+        ) : null}
+
         {isRobust ? (
           <section className="panelSection robustErrorPanel" aria-label="Robust overrotation error">
             <div className="sectionHeader">
               <h3>Pulse error</h3>
-              <span className="sandboxStateKet">{"\u03b5"}</span>
+              <span className="sandboxStateKet">{"\u03b5 = "}{formatEpsilon(activeOverrotationEpsilon)}</span>
             </div>
-            <label className="epsilonSlider">
+            <div className="fixedErrorGrid">
               <span>Fractional overrotation</span>
-              <input
-                type="range"
-                min="-0.1"
-                max="0.1"
-                step="0.005"
-                value={robustEpsilon.toFixed(3)}
-                onChange={(event) => setRobustEpsilonValue(event.target.value)}
-                disabled={isRunning}
-              />
-            </label>
-            <div className="angleInputGrid compactInputGrid">
-              <label>
-                <span>{"\u03b5"}</span>
-                <input
-                  type="number"
-                  min="-0.1"
-                  max="0.1"
-                  step="0.005"
-                  value={robustEpsilonInput}
-                  onChange={(event) => setRobustEpsilonValue(event.target.value)}
-                  disabled={isRunning}
-                />
-              </label>
-              <label>
-                <span>scale</span>
-                <input type="text" value={(1 + activeOverrotationEpsilon).toFixed(3) + "x"} readOnly />
-              </label>
+              <strong>{formatEpsilon(activeOverrotationEpsilon)}</strong>
+              <span>Pulse scale</span>
+              <strong>{(1 + activeOverrotationEpsilon).toFixed(3)}x</strong>
             </div>
           </section>
         ) : null}
@@ -1079,7 +1115,9 @@ export default function App() {
           </div>
           <p className="gateSetNote">{isSandbox ? `Sandbox mode - all standard gates - ${gateUsageText}` : isRobust ? gateUsageText : <>{puzzleKind === "gate-design" ? "Challenge" : "Gate set"}: {renderMathLabel(puzzle.gateSetLabel ?? "All gates available")} - {gateUsageText}</>}</p>
           <div className="gateGrid">
-            {visibleGateOrder.map((gateName) => (
+            {visibleGateOrder.map((gateName) => {
+              const gateDescription = gateDescriptionForName(gateName);
+              return (
               <button
                 key={gateName}
                 type="button"
@@ -1088,9 +1126,10 @@ export default function App() {
                 disabled={isRunning || gateLimitReached}
               >
                 <span className={isPulseGate(gateName) ? "pulseGateButtonSymbol" : ""}>{renderGateSymbol(gateName)}</span>
-                <small>{gateLimitReached ? "Gate limit reached" : STANDARD_GATES[gateName].description}</small>
+                <small>{gateLimitReached ? "Gate limit reached" : gateDescription}</small>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
         <section className="panelSection details">

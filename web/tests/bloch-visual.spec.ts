@@ -18,8 +18,8 @@ test("robust composite levels reject noisy shortcuts", () => {
     const robustPuzzle = puzzle!;
     const threshold = robustPuzzle.successThreshold ?? 0.999;
 
-    const shortcutResult = evaluatePuzzle(robustPuzzle, shortcut, 0.05);
-    const solutionResult = evaluatePuzzle(robustPuzzle, robustPuzzle.solution, 0.05);
+    const shortcutResult = evaluatePuzzle(robustPuzzle, shortcut, 0.1);
+    const solutionResult = evaluatePuzzle(robustPuzzle, robustPuzzle.solution, 0.1);
 
     expect(isPuzzleSolved(robustPuzzle, shortcutResult.fidelity, shortcut.length)).toBe(false);
     expect(solutionResult.fidelity).toBeGreaterThanOrEqual(threshold);
@@ -124,6 +124,25 @@ test("sandbox accepts custom initial Bloch angles", async ({ page }) => {
   await expect(page.getByText("(θ, ϕ) = (0.00 deg, 0.00 deg)")).toBeVisible({ timeout: 5000 });
 });
 
+test("sandbox can add arbitrary rotation gates", async ({ page }) => {
+  test.setTimeout(30000);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: /QUBIT GOLF/ })).toBeVisible();
+  await page.getByRole("button", { name: /Start sandbox/ }).click();
+  await expect(page.getByRole("heading", { name: "Sandbox", exact: true })).toBeVisible();
+
+  const rotationPanel = page.getByLabel("Sandbox custom rotation");
+  await rotationPanel.getByRole("spinbutton", { name: /angle/ }).fill("180");
+  await rotationPanel.getByRole("button", { name: "Add rotation" }).click();
+  await expect(page.locator(".desktopCircuit").getByLabel("Current gate sequence").getByText(/R/)).toBeVisible();
+
+  await page.getByRole("button", { name: "RUN" }).click();
+  await expect(page.getByLabel("Current result").getByText("1")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator(".details").getByText(/180\.00 deg/)).toBeVisible({ timeout: 5000 });
+});
+
 test("sandbox can animate unitary probe trio", async ({ page }) => {
   test.setTimeout(35000);
   await page.setViewportSize({ width: 1280, height: 840 });
@@ -179,7 +198,10 @@ test("robust gate design exposes controls without noisy helper text", async ({ p
   await page.getByRole("button", { name: /Start Robust gate design Level 1/ }).click();
 
   await expect(page.getByRole("heading", { name: "Robust bit flip" })).toBeVisible();
-  await expect(page.getByLabel("Robust overrotation error")).toBeVisible();
+  const robustErrorPanel = page.getByLabel("Robust overrotation error");
+  await expect(robustErrorPanel).toBeVisible();
+  await expect(robustErrorPanel.getByText(/= \+0\.100/)).toBeVisible();
+  await expect(robustErrorPanel.locator('input[type="range"]')).toHaveCount(0);
   await expect(page.getByText("Pulse error: \u03b5 = +0.050")).not.toBeVisible();
   await expect(page.getByText("Every pulse is animated and scored with this pulse-length error.")).not.toBeVisible();
   await expect(page.getByText(/Noisy gate set/)).not.toBeVisible();
