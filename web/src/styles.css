@@ -1048,25 +1048,18 @@ select {
   color: var(--cyan-dark);
 }
 
-.fixedErrorGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 12px;
-  align-items: baseline;
-}
-
-.fixedErrorGrid span {
+.fixedErrorLine {
+  margin: 0;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.9rem;
   font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.fixedErrorGrid strong {
+.fixedErrorLine span {
   color: var(--cyan-dark);
   font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
   font-size: 1rem;
+  font-weight: 900;
 }
 
 .epsilonSlider {

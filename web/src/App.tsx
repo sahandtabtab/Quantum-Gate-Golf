@@ -1091,16 +1091,7 @@ export default function App() {
 
         {isRobust ? (
           <section className="panelSection robustErrorPanel" aria-label="Robust overrotation error">
-            <div className="sectionHeader">
-              <h3>Pulse error</h3>
-              <span className="sandboxStateKet">{"\u03b5 = "}{formatEpsilon(activeOverrotationEpsilon)}</span>
-            </div>
-            <div className="fixedErrorGrid">
-              <span>Fractional overrotation</span>
-              <strong>{formatEpsilon(activeOverrotationEpsilon)}</strong>
-              <span>Pulse scale</span>
-              <strong>{(1 + activeOverrotationEpsilon).toFixed(3)}x</strong>
-            </div>
+            <p className="fixedErrorLine">Fractional overrotation: <span>{"\u03b5 = "}{activeOverrotationEpsilon.toFixed(1)}</span></p>
           </section>
         ) : null}
 

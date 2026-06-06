@@ -200,7 +200,8 @@ test("robust gate design exposes controls without noisy helper text", async ({ p
   await expect(page.getByRole("heading", { name: "Robust bit flip" })).toBeVisible();
   const robustErrorPanel = page.getByLabel("Robust overrotation error");
   await expect(robustErrorPanel).toBeVisible();
-  await expect(robustErrorPanel.getByText(/= \+0\.100/)).toBeVisible();
+  await expect(robustErrorPanel.getByText(/Fractional overrotation:.*= 0\.1/)).toBeVisible();
+  await expect(robustErrorPanel.getByText("Pulse scale")).not.toBeVisible();
   await expect(robustErrorPanel.locator('input[type="range"]')).toHaveCount(0);
   await expect(page.getByText("Pulse error: \u03b5 = +0.050")).not.toBeVisible();
   await expect(page.getByText("Every pulse is animated and scored with this pulse-length error.")).not.toBeVisible();
